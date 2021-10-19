@@ -1,16 +1,16 @@
 baseURL: http://MLANEMFA2022-portfolio.org/
 languageCode: en-us
 title: Matthew Lnae Portfolio Website
-theme: forty
+theme: MarcusVirg/forty
 googleAnalytics: ''
 disqusShortname: ''
 params:
   banner:
     buttonText: Get Started
     subtitle: |-
-      ## A RESPONSIVE SITE TEMPLATE DESIGNED BY HTML5 UP
-      ## AND RELEASED UNDER THE CREATIVE COMMONS.
-    title: Hi, my name is Matthew Lane
+      ## My portfolio website released under the creative commons
+      #
+    title: Hi, my name is Matthew Lane. This is my portfolio website representing the individual assignment portion of the Data Analytics for Finance course at LBS. 
   blog: {}
   contact:
     address:
@@ -26,7 +26,7 @@ params:
         title: Email
     enable: no
     phone:
-      - phone: (000) 000-0000 x1234
+      - phone: 07714472280
         title: Phone
   custom_css: []
   custom_js: []
