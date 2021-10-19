@@ -87,10 +87,10 @@ params:
         subtitle: Click to view my Machine Learning for Economics project
         title: Machine Learning
         url: blogs/tempus
-      - image: pic03.jpg
-        subtitle: Lorem Etiam Nullam
-        title: Magna
-        url: blogs/magna
+      - image: pic99.jpg
+        subtitle: Rmd file calculating Risk-Return trade for DJIA stocks
+        title: Risk Return Analysis
+        url: blogs/risk_return
       - image: pic06.jpg
         subtitle: Nisl Sed Aliquam
         title: Ipsum
