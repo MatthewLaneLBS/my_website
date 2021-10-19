@@ -82,7 +82,7 @@ params:
       - image: IMG_2642.jpg
         subtitle: Select to view current CV
         title: CV
-        url: blogs/CV
+        url: blogs/aliquam
       - image: pic02.jpg
         subtitle: Click to view my Machine Learning for Economics project
         title: Machine Learning
