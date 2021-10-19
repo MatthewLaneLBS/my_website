@@ -8,9 +8,9 @@ params:
   banner:
     buttonText: Get Started
     subtitle: |-
-      ## My portfolio website released under the creative commons
+      My portfolio website released under the creative commons
     
-    title: Hi, my name is Matthew Lane. This is my portfolio website representing the individual assignment portion of the Data Analytics for Finance course at LBS. 
+    title: Hi, my name is Matthew Lane. This is my portfolio website!
   blog: {}
   contact:
     address:
@@ -54,7 +54,7 @@ params:
         url: https://www.github.com
       - icon: fa-linkedin
         label: LinkedIn
-        url: https://www.linkedin.com
+        url: https://www.linkedin.com/in/matthewtlane
   image: ''
   name: Your name
   navigation:
@@ -79,7 +79,7 @@ params:
   tiles:
     enable: yes
     showcase:
-      - image: pic01.jpg
+      - image: IMG_2642.jpg
         subtitle: Ipsum Dolor Sit Amet
         title: Aliquam
         url: blogs/aliquam
