@@ -79,10 +79,10 @@ params:
   tiles:
     enable: yes
     showcase:
-      - image: pic01.jpg
+      - image: IMG_2642.jpg
         subtitle: Select to view current CV
         title: CV
-        url: file:///Users/matthewtlane/Documents/LBS/Matthew%20Lane%20CV%202021.html
+        url: blogs/CV
       - image: pic02.jpg
         subtitle: Click to view my Machine Learning for Economics project
         title: Machine Learning
