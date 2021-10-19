@@ -79,7 +79,7 @@ params:
   tiles:
     enable: yes
     showcase:
-      - image: IMG_2642.jpg.
+      - image: IMG_2642.jpg
         subtitle: Select to view current CV
         title: CV
         url: blogs/CV
