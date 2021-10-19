@@ -79,7 +79,7 @@ params:
   tiles:
     enable: yes
     showcase:
-      - image: IMG_2642.jpg
+      - image: IMG_2642.jpg.
         subtitle: Select to view current CV
         title: CV
         url: blogs/CV
@@ -90,7 +90,7 @@ params:
       - image: pic99.jpg
         subtitle: Rmd file calculating Risk-Return trade for DJIA stocks
         title: Risk Return Analysis
-        url: blogs/risk_return
+        url: content/blogs/risk_return.Rmd
       - image: pic06.jpg
         subtitle: Nisl Sed Aliquam
         title: Ipsum
