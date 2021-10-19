@@ -90,7 +90,7 @@ params:
       - image: pic99.jpg
         subtitle: Rmd file calculating Risk-Return trade for DJIA stocks
         title: Risk Return Analysis
-        url: content/blogs/risk_return.Rmd
+        url: content/blogs/blog1.md
       - image: pic06.jpg
         subtitle: Nisl Sed Aliquam
         title: Ipsum
