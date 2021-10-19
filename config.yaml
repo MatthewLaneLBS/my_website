@@ -1,6 +1,6 @@
 baseURL: http://MLANEMFA2022-portfolio.org/
 languageCode: en-us
-title: Matthew Lnae Portfolio Website
+title: Matthew Lane Portfolio Website
 theme: MarcusVirg/forty
 googleAnalytics: ''
 disqusShortname: ''
@@ -9,7 +9,7 @@ params:
     buttonText: Get Started
     subtitle: |-
       ## My portfolio website released under the creative commons
-      #
+    
     title: Hi, my name is Matthew Lane. This is my portfolio website representing the individual assignment portion of the Data Analytics for Finance course at LBS. 
   blog: {}
   contact:
@@ -36,7 +36,7 @@ params:
     text: Please visit [this page](/)
   favicon: favicon.ico
   footer:
-    copyright: London Business School
+    copyright: Matthew Lane
     enable: yes
     quicklinks:
       - alt: HTML5 UP
