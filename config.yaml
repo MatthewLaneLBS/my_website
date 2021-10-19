@@ -82,7 +82,7 @@ params:
       - image: pic01.jpg
         subtitle: Select to view current CV
         title: CV
-        url: blogs/aliquam
+        url: file:///Users/matthewtlane/Documents/LBS/Matthew%20Lane%20CV%202021.html
       - image: pic02.jpg
         subtitle: Click to view my Machine Learning for Economics project
         title: Machine Learning
@@ -91,11 +91,11 @@ params:
         subtitle: Lorem Etiam Nullam
         title: Magna
         url: blogs/magna
-      - image: pic04.jpg
+      - image: pic06.jpg
         subtitle: Nisl Sed Aliquam
         title: Ipsum
         url: blogs/ipsum
-      - image: pic06.jpg
+      - image: pic05.jpg
         subtitle: Ipsum Dolor Sit Amet
         title: Consequat
         url: blogs/ipsum
