@@ -95,8 +95,8 @@ params:
         title: Ipsum
         url: blogs/ipsum
       - image: lbs.jpg
-        subtitle: London Business School
-        title: Consequat
+        subtitle: Consequat
+        title: London Business School
         url: blogs/ipsum
 #      - image: pic06.jpg
 #       subtitle: Feugiat Amet Tempus
