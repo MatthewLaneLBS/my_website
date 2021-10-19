@@ -79,13 +79,13 @@ params:
   tiles:
     enable: yes
     showcase:
-      - image: IMG_2642.jpg
-        subtitle: Ipsum Dolor Sit Amet
-        title: Aliquam
+      - image: pic01.jpg
+        subtitle: Select to view current CV
+        title: CV
         url: blogs/aliquam
       - image: pic02.jpg
-        subtitle: Feugiat Amet Tempus
-        title: Tempus
+        subtitle: Click to view my Machine Learning for Economics project
+        title: Machine Learning
         url: blogs/tempus
       - image: pic03.jpg
         subtitle: Lorem Etiam Nullam
@@ -95,14 +95,14 @@ params:
         subtitle: Nisl Sed Aliquam
         title: Ipsum
         url: blogs/ipsum
-      - image: pic05.jpg
+      - image: pic06.jpg
         subtitle: Ipsum Dolor Sit Amet
         title: Consequat
         url: blogs/ipsum
-      - image: pic06.jpg
-        subtitle: Feugiat Amet Tempus
-        title: Etiam
-        url: blogs/ipsum
+#      - image: pic06.jpg
+#       subtitle: Feugiat Amet Tempus
+#        title: Etiam
+#        url: blogs/ipsum
   two:
     buttonText: Get Started
     enable: yes
