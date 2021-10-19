@@ -60,7 +60,7 @@ params:
     button1:
       - name: Get Started
         url: blogs
-    button2:
+#    button2:
 #      - name: Log In
 #        url: '#'
     links:
