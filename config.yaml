@@ -101,7 +101,7 @@ params:
       - image: Westminster.jpg
        subtitle: Click to view markdown file of my third group project for Data Analytics for Finance
         title: Group Project 3
-        url: blogs/ipsum3
+        url: blogs/ipsum
 #  two:
 #    buttonText: Get Started
 #    enable: yes
