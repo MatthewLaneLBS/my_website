@@ -93,7 +93,7 @@ params:
       - image: CanaryWharf.jpg
         subtitle: Click to view markdown file of my first group project for Data Analytics for Finance
         title: Group Project 1
-        url: blogs/groupproject1
+        url: blogs/ipsum
       - image: CityofLondon.jpg
         subtitle: Click to view markdown file of my second group project for Data Analytics for Finance
         title: Group Project 2
