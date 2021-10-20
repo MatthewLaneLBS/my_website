@@ -83,7 +83,7 @@ params:
         title: CV
         url: blogs/Matthew_Lane_CV_2021
       - image: pic02.jpg
-        subtitle: Click to view my Machine Learning for Economics project
+        subtitle: Code for my undergraduate Machine Learning project predicting house prices in Taiwan. 
         title: Machine Learning
         url: blogs/house_price_prediction
       - image: pic99.jpg

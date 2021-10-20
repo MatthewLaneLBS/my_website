@@ -16,9 +16,15 @@ title: Machine Learning Project
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Final Assignment #
+# Machine Learning Assignment #
 
-rm(list = ls())
+The following code is from my final year Machine Learning for Economics module at the Universiy of Exeter. 
+
+I took a set of house prices for the Sindian District, New Taipei City - as well as other local variables, such as distance to MRT station, house age, longitude and latitude - and attempted to predict these house prices using 12 machine learning methods. 
+
+The Random Forest method achieved the best result, capturing around 75% of the price variability with an expected error of approx 17%. Scroll to the bottom to see a plot of every methods' R-squared and MSE values.
+
+
 ```{r}
 rm(list = ls())
 library(MASS)
