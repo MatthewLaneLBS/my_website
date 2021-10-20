@@ -79,7 +79,7 @@ params:
     enable: yes
     showcase:
       - image: IMG_2642.jpg
-        subtitle: Select to view current CV
+        subtitle: Select to view my current CV
         title: CV
         url: blogs/Matthew_Lane_CV_2021
       - image: pic02.jpg
@@ -90,18 +90,18 @@ params:
         subtitle: Rmd file calculating Risk-Return trade for DJIA stocks
         title: Risk Return Analysis
         url: blogs/risk_return
-      - image: pic06.jpg
-        subtitle: Nisl Sed Aliquam
-        title: Ipsum
+      - image: CanaryWharf.jpg
+        subtitle: Click to view markdown file of my first group project for Data Analytics for Finance
+        title: Group Project 1
+        url: blogs/groupproject1
+      - image: CityofLondon.jpg
+        subtitle: Click to view markdown file of my second group project for Data Analytics for Finance
+        title: Group Project 2
         url: blogs/ipsum
-      - image: lbs.jpg
-        subtitle: Consequat
-        title: London Business School
-        url: blogs/ipsum
-#      - image: pic06.jpg
-#       subtitle: Feugiat Amet Tempus
-#        title: Etiam
-#        url: blogs/ipsum
+      - image: Westminster.jpg
+       subtitle: Click to view markdown file of my third group project for Data Analytics for Finance
+        title: Group Project 3
+        url: blogs/ipsum3
 #  two:
 #    buttonText: Get Started
 #    enable: yes
