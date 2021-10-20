@@ -97,11 +97,11 @@ params:
       - image: CityofLondon.jpg
         subtitle: Click to view markdown file of my second group project for Data Analytics for Finance
         title: Group Project 2
-        url: blogs/ipsum
+        url: blogs/group_project_2
       - image: Westminster.jpg
         subtitle: Click to view markdown file of my third group project for Data Analytics for Finance
         title: Group Project 3
-        url: blogs/ipsum
+        url: blogs/group_project_3
 #  two:
 #    buttonText: Get Started
 #    enable: yes
