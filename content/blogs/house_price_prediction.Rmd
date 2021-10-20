@@ -1,0 +1,1095 @@
+---
+categories:  
+- ""    #the front matter should be like the one found in, e.g., blog2.md. It cannot be like the normal Rmd we used
+- ""
+date: "2021-10-20"
+description: Prediction of House Prices in New Taipei City, Taiwan # the title that will show up once someone gets to this page
+draft: false
+image: Exeter.jpg # save picture in \static\img\blogs. Acceptable formats= jpg, jpeg, or png . Your iPhone pics wont work
+
+keywords: ""
+slug: house_price_prediction # slug is the shorthand URL address... no spaces plz
+title: Machine Learning Project
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Final Assignment #
+
+rm(list = ls())
+```{r}
+rm(list = ls())
+library(MASS)
+library(ISLR)
+library(tree)
+library(randomForest)
+library(gbm)
+library(glmnet)
+library(car)
+library(leaps)
+library(pls)
+library(boot)
+library(leaps)
+library(splines)
+library(gam)
+library(Hmisc)
+```
+
+
+```{r}
+# Adding the labour data set to RStudio
+library(readxl)
+RealEstateValuation_Data_ <-
+  read_excel(here::here("data","Real estate valuation data set.xlsx"))
+View(RealEstateValuation_Data_)
+```
+
+
+```{r}
+#renaming the variables so its easier to call upon in code
+RealEstateValuation_Data_$TransactionDate <-
+  (RealEstateValuation_Data_$`X1 transaction date`)
+
+RealEstateValuation_Data_$HouseAge <-
+  (RealEstateValuation_Data_$`X2 house age`)
+
+RealEstateValuation_Data_$MRTDist <-
+  (RealEstateValuation_Data_$`X3 distance to the nearest MRT station`)
+
+RealEstateValuation_Data_$StoreNum <-
+  (RealEstateValuation_Data_$`X4 number of convenience stores`)
+
+RealEstateValuation_Data_$Latitude <-
+  (RealEstateValuation_Data_$`X5 latitude`)
+
+RealEstateValuation_Data_$Longitude <-
+  (RealEstateValuation_Data_$`X6 longitude`)
+
+RealEstateValuation_Data_$HousePrice <-
+  (RealEstateValuation_Data_$`Y house price of unit area`)
+
+RealEstateValuation_Data_$LnHousePrice <-
+  log(RealEstateValuation_Data_$`Y house price of unit area`)
+```
+
+
+
+```{r}
+#Getting rid of original column, as to not have duplicates
+RealEstateValuation_Data_$`X1 transaction date` = NULL
+RealEstateValuation_Data_$`X2 house age` = NULL
+RealEstateValuation_Data_$`X3 distance to the nearest MRT station` = NULL
+RealEstateValuation_Data_$`X4 number of convenience stores` = NULL
+RealEstateValuation_Data_$`X5 latitude` = NULL
+RealEstateValuation_Data_$`X6 longitude` = NULL
+RealEstateValuation_Data_$`Y house price of unit area` = NULL
+
+View(RealEstateValuation_Data_)
+```
+
+###Data and Exploratory Analysis ###
+
+
+```{r}
+describe(RealEstateValuation_Data_) #gives us: the top 5 max values, bottom 5 minimum values, mean, quantiles, observations, missing observations.
+
+# Correlation Matrix
+cor(RealEstateValuation_Data_) #The most correlated with HousePrice: MRTDist (negative), StoreNum (positive), Latitude (positive), longitude (positive).
+pairs(HousePrice ~ TransactionDate + MRTDist + StoreNum + Latitude + Longitude,
+      data = RealEstateValuation_Data_)
+
+```
+
+```{r}
+
+#Scatterplots of HousePrice with the explanatory variables to ascertain an idea of a functional form.
+par(mfrow = c(1, 1))
+
+plot(
+  RealEstateValuation_Data_$`TransactionDate`,
+  RealEstateValuation_Data_$HousePrice
+)
+lines(
+  RealEstateValuation_Data_$`TransactionDate`,
+  predict(
+    lm(HousePrice ~ TransactionDate, data = RealEstateValuation_Data_)
+  ),
+  type = "l",
+  col = "orange1",
+  lwd = 2
+)
+title("Figure 1")
+
+plot(RealEstateValuation_Data_$`HouseAge`,
+     RealEstateValuation_Data_$HousePrice) #Looks like a non-linear relationship. Different model may increase R squared.
+lines(
+  RealEstateValuation_Data_$`HouseAge`,
+  predict(lm(HousePrice ~ HouseAge, data = RealEstateValuation_Data_)),
+  type = "l",
+  col = "orange1",
+  lwd = 2
+)
+title("Figure 2")
+
+plot(x = RealEstateValuation_Data_$MRTDist, y = RealEstateValuation_Data_$HousePrice) #Looks like a non-linear relationship - different method likely to increase R squared.
+lines(
+  RealEstateValuation_Data_$MRTDist,
+  predict(lm(HousePrice ~ MRTDist, data = RealEstateValuation_Data_)),
+  type = "l",
+  col = "orange1",
+  lwd = 2
+)
+title("Figure 3")
+hist(RealEstateValuation_Data_$'MRTDist', main = paste("Figure 4"))
+
+plot(RealEstateValuation_Data_$StoreNum,
+     RealEstateValuation_Data_$HousePrice) #Looks like a linear model fits it well.
+lines(
+  RealEstateValuation_Data_$StoreNum,
+  predict(lm(HousePrice ~ StoreNum, data = RealEstateValuation_Data_)),
+  type = "l",
+  col = "orange1",
+  lwd = 2
+)
+title("Figure 5")
+hist(RealEstateValuation_Data_$`StoreNum`, main = paste("Figure 6"))
+
+
+plot(RealEstateValuation_Data_$Latitude,
+     RealEstateValuation_Data_$Longitude,
+     data = RealEstateValuation_Data_)
+title("Figure 7")
+
+plot(RealEstateValuation_Data_$`Latitude`,
+     RealEstateValuation_Data_$HousePrice)
+lines(
+  RealEstateValuation_Data_$`Latitude`,
+  predict(lm(HousePrice ~ Latitude, data = RealEstateValuation_Data_)),
+  type = "l",
+  col = "orange1",
+  lwd = 2
+)
+title("Figure 8")
+
+plot(RealEstateValuation_Data_$`Longitude`,
+     RealEstateValuation_Data_$HousePrice)
+lines(
+  RealEstateValuation_Data_$`Longitude`,
+  predict(lm(HousePrice ~ Longitude, data = RealEstateValuation_Data_)),
+  type = "l",
+  col = "orange1",
+  lwd = 2
+)
+title("Figure 9")
+
+```
+
+```{r}
+
+#Simple linear regression to determine explanatory power by individual variables on house price (in linear form).
+
+sm.trans = lm(HousePrice ~ TransactionDate, data = RealEstateValuation_Data_)
+summary(sm.trans) #very insignificant p-value rejected at 5% significance
+
+sm.age = lm(HousePrice ~ HouseAge, data = RealEstateValuation_Data_)
+summary(sm.age) #Not much explanatory power - R squared is 0.04434 but P-value is significant at all levels.
+
+sm.MRT = lm(HousePrice ~ MRTDist, data = RealEstateValuation_Data_)
+summary(sm.MRT) #High explanatory power - R squared is 0.4538, P-value significant at all levels.
+
+sm.store = lm(HousePrice ~ StoreNum, data = RealEstateValuation_Data_)
+summary(sm.store) # High explanatory power - R squared is 0.326, P-value significant at all levels.
+
+sm.lat = lm(HousePrice ~ Latitude, data = RealEstateValuation_Data_)
+summary(sm.lat) #Reasonably high explanatory power - R squared is 0.2985, P-value is significant at all levels.
+
+sm.long = lm(HousePrice ~ Longitude, data = RealEstateValuation_Data_)
+summary(sm.long) #Reasonably high explanatory power - R squared is 0.2738, P-value is significant at all levels.
+
+par(mfrow = c(2, 2))
+hist(RealEstateValuation_Data_$`HouseAge`)
+hist(RealEstateValuation_Data_$'MRTDist')
+hist(RealEstateValuation_Data_$`TransactionDate`)
+hist(RealEstateValuation_Data_$`StoreNum`)
+
+par(mfrow = c(1, 1))
+boxplot.Price.Store <-
+  boxplot(HousePrice ~ StoreNum, data = RealEstateValuation_Data_)
+boxplot.Price.Store$stats
+
+par(mfrow = c(1, 1))
+plot(RealEstateValuation_Data_$Latitude,
+     RealEstateValuation_Data_$Longitude,
+     data = RealEstateValuation_Data_)
+
+hist(RealEstateValuation_Data_$HousePrice)
+
+```
+
+
+
+### Machine Learning Methods ###
+
+```{r}
+# Separating the data into train & test, decide on the method
+set.seed(10)
+train <-
+  sample(1:289, 289) # Taking the first 289 observations(70% of the data for training)
+REV.train <- RealEstateValuation_Data_[train, ] # 289 obvs
+REV.test <- RealEstateValuation_Data_[-train, ] # 125 obvs
+
+```
+
+
+## Multiple linear regression ##
+```{r}
+set.seed(10)
+lm.REV <-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+     data = RealEstateValuation_Data_)
+summary(lm.REV)
+```
+
+
+```{r}
+#Diagnostic Plots
+par(mfrow = c(2, 2))
+plot(lm.REV)
+
+# Outliers & High Leverage Points
+index.outlier <- which(rstudent(lm.REV) > 3 | rstudent(lm.REV) < -3)
+length(index.outlier) # number of outliers = 7
+average_leverage <- 7 / 414
+index.highlev <- which(hatvalues(lm.REV) > average_leverage * 3)
+length(index.highlev) # number of high leverage points = 11
+
+par(mfrow = c(1, 1))
+plot(hatvalues(lm.REV))
+
+# Variation Inflation Factor
+vif(lm.REV) # House Age has the lowest VIF value of 1.014287 and MRTDist has the highest of 4.323019. As none of the VIF scores are above 5 one can infer that no significant multi-collinearity exists between the variables. MRTDist is likely to share some collinearity with Latitude and Longitude due to the nature of MRT station distribution around the city, however as stated this report doesn’t consider collinearity to be a noticeable problem. 
+
+```
+
+```{r}
+
+lm.REV.train <-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+     data = REV.train)
+summary(lm.REV.train)
+lm.pred <- predict(lm.REV.train, REV.test)
+
+mean((lm.pred - REV.test$HousePrice) ^ 2)
+lm.test.r2 <-
+  1 - sum((REV.test$HousePrice - lm.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^2)
+lm.test.r2 # 0.5919161
+
+```
+
+
+```{r}
+# Introduce during Best Subset #
+lm.REV2 <-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude,
+     data = RealEstateValuation_Data_)
+summary(lm.REV2) # R-sqaured 0.5823, RSE = 8.847
+mean(lm.REV2$residuals ^ 2) # MSE = 77.14143
+
+anova(lm.REV, lm.REV2) # P-value very high meaning models are very similar, therefore second model better. One less variable and better adj R-squared.
+plot(lm.REV2)
+
+lm.REV2.train <-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude,
+     data = REV.train)
+summary(lm.REV2.train) # R-squared = 0.5826, RSE = 8.957
+```
+
+```{r}
+
+# Taking the natural logarithm of house price and testing it
+set.seed(10)
+ln.REV <-
+  lm(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude +
+      Longitude,
+    data = RealEstateValuation_Data_
+  )
+summary(ln.REV) # R-squared = 0.6857, RSE = 0.2214
+
+ln.fit <-
+  lm(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude +
+      Longitude,
+    data = REV.train
+  )
+summary(ln.fit) # R-sqaured = 0.6984, RSE = 0.2227
+ln.pred <- predict(ln.fit, REV.test)
+converted.back <- exp(ln.pred)
+View(converted.back)
+mean((converted.back - REV.test$HousePrice) ^ 2) #MSE = 61.56653
+ln.test.r2 <-
+  1 - sum((REV.test$HousePrice - converted.back) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                              2)
+ln.test.r2 # 0.6149192
+
+par(mfrow = c(1, 1))
+hist(RealEstateValuation_Data_$HousePrice, main = paste("Figure 7"))
+hist(RealEstateValuation_Data_$'LnHousePrice')
+
+```
+
+
+## Subset selection ##
+
+```{r}
+
+# Best Subset Selection #
+reg.full <-
+  regsubsets(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = RealEstateValuation_Data_,
+    nvmax = 6
+  )
+reg.summary <- summary(reg.full)
+reg.summary
+
+par(mfrow = c(1, 3))
+# Cp = 5 variable model best
+plot(reg.summary$cp,
+     xlab = "No. of variables",
+     ylab = "Cp",
+     type = "l")
+points(
+  which.min(reg.summary$cp),
+  reg.summary$cp[which.min(reg.summary$cp)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+# BIC = 5 variable model best
+plot(reg.summary$bic,
+     xlab = "No. of variables",
+     ylab = "BIC",
+     type = "l")
+points(
+  which.min(reg.summary$bic),
+  reg.summary$bic[which.min(reg.summary$bic)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+# Adj- R2 = 5 variable model best
+plot(reg.summary$adjr2,
+     xlab = "No. of variables",
+     ylab = "Adj. R2",
+     type = "l")
+points(
+  which.max(reg.summary$adjr2),
+  reg.summary$adjr2[which.max(reg.summary$adjr2)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+
+coef(reg.full, 5) # Best subset is with 5 variables #
+
+```
+
+
+# Forward Stepwise Selection #
+
+```{r}
+
+reg.fwd <-
+  regsubsets(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    nvmax = 6,
+    method = "forward"
+  )
+reg.summary.fwd <- summary(reg.fwd)
+reg.summary.fwd
+
+
+par(mfrow = c(1, 3))
+# Cp = 5 variables best
+plot(reg.summary.fwd$cp,
+     xlab = "No. of variables",
+     ylab = "Cp",
+     type = "l")
+points(
+  which.min(reg.summary.fwd$cp),
+  reg.summary.fwd$cp[which.min(reg.summary.fwd$cp)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+# BIC = 5 vars best
+plot(reg.summary.fwd$bic,
+     xlab = "No. of variables",
+     ylab = "BIC",
+     type = "l")
+points(
+  which.min(reg.summary.fwd$bic),
+  reg.summary.fwd$bic[which.min(reg.summary.fwd$bic)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+# Adj R2 = 5 vars best
+plot(
+  reg.summary.fwd$adjr2,
+  xlab = "No. of variables",
+  ylab = "Adj. R2",
+  type = "l"
+)
+points(
+  which.max(reg.summary.fwd$adjr2),
+  reg.summary.fwd$adjr2[which.max(reg.summary.fwd$adjr2)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+
+
+coef(reg.fwd, 5) # Best subset is with 5 variables #
+
+```
+
+# Backward stepwise selection #
+
+```{r}
+
+reg.bwd <-
+  regsubsets(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    nvmax = 6,
+    method = "backward"
+  )
+reg.summary.bwd <- summary(reg.bwd)
+reg.summary.bwd
+
+par(mfrow = c(1, 3))
+# Cp = 5 variables best
+plot(reg.summary.bwd$cp,
+     xlab = "No. of variables",
+     ylab = "Cp",
+     type = "l")
+points(
+  which.min(reg.summary.bwd$cp),
+  reg.summary.bwd$cp[which.min(reg.summary.bwd$cp)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+# BIC = 5 vars best
+plot(reg.summary.bwd$bic,
+     xlab = "No. of variables",
+     ylab = "BIC",
+     type = "l")
+points(
+  which.min(reg.summary.bwd$bic),
+  reg.summary.bwd$bic[which.min(reg.summary.bwd$bic)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+# Adj R2 = 5 vars best
+plot(
+  reg.summary.bwd$adjr2,
+  xlab = "No. of variables",
+  ylab = "Adj. R2",
+  type = "l"
+)
+points(
+  which.max(reg.summary.bwd$adjr2),
+  reg.summary.bwd$adjr2[which.max(reg.summary.bwd$adjr2)],
+  col = "red",
+  cex = 2,
+  pch = 20
+)
+
+coef(reg.bwd, 5) # Best subset is with 5 variables #
+
+```
+
+```{r}
+
+# All subset methods highlight a 5 variable model is best. They also agree that longitude is the variable of least importance and should be dropped #
+lm.REV.bestsubset.train <-
+  lm(LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude,
+     data = REV.train)
+summary(lm.REV.bestsubset.train) # R-squared = 0.6795, RSE = 0.2305
+
+lm.REV.bestsubset.test <- predict(lm.REV.bestsubset.train, REV.test)
+mean((REV.test$HousePrice - (exp(
+  lm.REV.bestsubset.test
+))) ^ 2) #MSE = 61.45236
+ln.bestsubset.r2 <-
+  1 - sum((REV.test$LnHousePrice - lm.REV.bestsubset.test) ^ 2) / sum((REV.test$LnHousePrice - mean(REV.test$LnHousePrice)) ^
+                                                                        2)
+ln.bestsubset.r2 # R-squared = 0.6992486
+
+
+```
+
+
+
+## Ridge and Lasso ##
+
+
+# Ridge #
+```{r}
+
+set.seed(10)
+
+train.X <-
+  model.matrix(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train
+  )[, -1]
+test.X <-
+  model.matrix(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.test
+  )[, -1]
+grid <-
+  10 ^ seq(5,-3, length = 414) # computes the CV error for the 100 values for the ridge regression # IS THIS NECESSARY
+
+ridge.mod <-
+  glmnet(train.X,
+         REV.train$LnHousePrice,
+         alpha = 0,
+         lambda = grid) # alpha = 0 tells R that we want to do ridge
+ridge.cv <-
+  cv.glmnet(train.X,
+            REV.train$LnHousePrice,
+            alpha = 0,
+            lamda = grid)
+
+par(mfrow = c(1, 1))
+plot(ridge.cv) # MSE minimised when lambda is very small, so the original least squared regression good at minimising MSE for this model
+# first dotted line gives minimum MSE and the second gives the smallest MSE within 1 se of the minimum
+
+ridge.bestlam <- ridge.cv$lambda.min
+ridge.bestlam # 0.02984678
+predict(ridge.mod,
+        type = "coefficients",
+        s = ridge.bestlam,
+        newx = test.X)
+summary(lm.REV) # Coefficient Comparison
+
+ridge.pred1 <- predict(ridge.mod, s = ridge.bestlam, newx = test.X)
+mean((REV.test$HousePrice - exp(ridge.pred1)) ^ 2) # MSE = 62.69749
+
+# within 1 se
+ridge.1se <- ridge.cv$lambda.1se
+ridge.1se # 0.3679651
+ridge.pred2 <- predict(ridge.mod, s = ridge.1se, newx = test.X)
+mean((exp(ridge.pred2) - REV.test$HousePrice) ^ 2)  # 71.8387, MSE goes up quite a bit
+
+rss.ridge <- mean((ridge.pred1 - REV.test$LnHousePrice) ^ 2)
+
+```
+
+# Lasso regression #
+```{r}
+
+lasso.mod <-
+  glmnet(train.X,
+         REV.train$LnHousePrice,
+         alpha = 1,
+         lambda = grid) # alpha = 1 for lasso
+lasso.cv <-
+  cv.glmnet(train.X,
+            REV.train$LnHousePrice,
+            alpha = 1,
+            lambda = grid)
+plot(lasso.cv) # if high enough values of lambda chosen, number of predictor variables drop to 0,
+
+lasso.bestlam <- lasso.cv$lambda.min
+lasso.bestlam # 0.002440109
+lasso.pred1 <- predict(lasso.mod, s = lasso.bestlam, newx = test.X)
+mean((exp(lasso.pred1) - REV.test$HousePrice) ^ 2) # MSE = 61.44527
+predict(lasso.mod, type = "coefficients", s = lasso.bestlam) # All coefficients used
+
+# Most sparse lasso model with 1 se
+lasso.1se <- lasso.cv$lambda.1se
+lasso.1se # 2.805058
+lasso.pred2 <- predict(lasso.mod, s = lasso.1se, newx = test.X)
+mean((exp(lasso.pred2) - REV.test$HousePrice) ^ 2) # 71.62681, MSE goes up quite a bit, is ridge better?
+predict(lasso.mod, type = "coefficients", s = lasso.1se) # only 2 zero coefficients on variables.
+
+ln.test.avg <- mean(RealEstateValuation_Data_$LnHousePrice)
+rss.lasso <-
+  mean((lasso.pred1 - REV.test$HousePrice) ^ 2) # 1st as MSE is lower and only uses one more variable
+lasso.test.r2 = 1 - mean((REV.test$LnHousePrice - lasso.pred1) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                             2)
+lasso.test.r2
+
+```
+
+
+### PCR and PLS ###
+
+# PCR #
+```{r}
+set.seed(10)
+pcr.mod <-
+  pcr(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    scale = TRUE,
+    validation = "CV"
+  )
+summary(pcr.mod) #
+validationplot(pcr.mod, val.type = "MSEP")
+
+pcr.pred <-
+  predict(pcr.mod, REV.test, ncomp = 4) # REV.test - should it be 6 components?
+mean((exp(pcr.pred) - REV.test$HousePrice) ^ 2)  # MSE = 67.50837, same as ridge
+ln.test.avg <- mean(RealEstateValuation_Data_$LnHousePrice)
+pcr.test.r2 <-
+  1 - mean((REV.test$LnHousePrice - pcr.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                            2)
+pcr.test.r2
+
+```
+
+
+# PLS #
+
+```{r}
+
+pls.mod <-
+  plsr(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    scale = TRUE,
+    validation = "CV"
+  )
+summary(pls.mod)
+validationplot(pls.mod, val.type = "MSEP") # shows ideal M is 13 components
+
+pls.pred <- predict(pls.mod, REV.test, ncomp = 4) # REV.test
+mean((exp(pls.pred) - REV.test$HousePrice) ^ 2)  # MSE = 61.75218
+ln.test.avg = mean(REV.test$LnHousePrice)
+pcr.test.r2 = 1 - mean((REV.test$LnHousePrice - pcr.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+pcr.test.r2
+
+```
+
+
+
+### GAM ###
+```{r}
+
+# FIND TOP 3 REGRESSORS AND THEN WORK OUT OPTIMAL SPLITS/NO. LOCAL REGRESSIONS, check best variables using subset results #
+reg.full <-
+  regsubsets(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = RealEstateValuation_Data_,
+    nvmax = 6
+  )
+reg.summary <- summary(reg.full)
+reg.summary # Top 3 regressors, MRTDist, StoreNum, HouseAge
+
+set.seed(10)
+
+```
+
+```{r}
+
+# Range of DoF, plotted fits and RSS
+sp.rss <- rep(0, 18)
+for (i in 3:20) {
+  sp.fit1 <-
+    lm(HousePrice ~ bs(MRTDist, df = i) + bs(StoreNum, df = i) +
+                    bs(HouseAge, df = i), data = REV.train)
+  sp.rss[i - 2] <- sum(sp.fit1$residuals ^ 2) # storing RSS
+}
+sp.rss
+plot(3:20,
+     sp.rss,
+     ylab = "RSS",
+     xlab = "Degrees of Freedom",
+     type = "l")
+min(sp.rss) # 16113.72
+
+```
+
+```{r}
+
+# CV to select the best DoF
+cv.err <- rep(0, 18)
+for (i in 3:20) {
+  cv.fit <-
+    glm(HousePrice ~ bs(MRTDist, df = i) + bs(StoreNum, df = i) + bs(HouseAge, df =
+                                                                       i),
+        data = REV.train)
+  cv.err[i - 2] <-
+    cv.glm(REV.train, cv.fit, K = 10)$delta[1] # i-2 because the for loop starts at df = 3 so has to discount to fit the actual data which starts at 1.
+}
+cv.err
+plot(3:20,
+     cv.err,
+     ylab = "Test MSE",
+     xlab = "Degrees of Freedom",
+     type = "l")  # would choose df = 6 model, says 4 but have to add 2 on
+min(cv.err) # DOF = 11 gives lowest cv error of 78.25009
+
+gam.fit <-
+  gam(
+    HousePrice ~ bs(MRTDist, df = 11) + bs(StoreNum, df = 11) + bs(HouseAge, df = 11) + TransactionDate + Latitude,
+    data = REV.train
+  ) # REV.train
+par(mfrow = c(2, 3))
+plot(gam.fit, se = T, col = "green")
+summary(gam.fit) # look at Anova for Nonparametric Effects, only one variable is non-linear, can only reject one variables null hypothesis when tested for nonparametric effects, shows we need to focus our effect on Expend and add more knots to it
+# MRTDist and HouseAge very non linear
+
+gam.pred <- predict(gam.fit, REV.test) # REV.test
+mean((REV.test$HousePrice - gam.pred) ^ 2) # 53.11884 MSE
+
+# R2 = MSS/TSS = (TSS-RSS)/TSS = 1 - RSS/TSS
+gam.test1.r2 <-
+  1 - sum((REV.test$HousePrice - gam.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                        2)
+gam.test1.r2 # = 0.6677571
+
+```
+
+
+### Regression Tree ###
+
+```{r}
+
+dim(RealEstateValuation_Data_)
+
+set.seed(10)
+par(mfrow = c(1, 1))
+regtree.REV  <-
+  tree(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+       data = REV.train) # work out what's going on then add back in + Latitude + Longitude
+summary(regtree.REV)
+plot(regtree.REV)
+text(regtree.REV, pretty = 0, col = "Red")
+
+regtree.pred <- predict(regtree.REV, newdata = REV.test)
+mean((regtree.pred - REV.test$HousePrice) ^ 2) # MSE = 58.07941
+regtree.test1.r2 <-
+  1 - sum((REV.test$HousePrice - regtree.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                            2)
+regtree.test1.r2# = 0.6367302
+
+# CV to determine optimum complexity #
+set.seed(10)
+cv.REV <- cv.tree(regtree.REV)
+cv.REV
+par(mfrow = c(1, 1))
+plot(cv.REV$size, cv.REV$dev, type = "b") #  min occurs at size 10, $dev = RSS
+
+# tree-pruning #
+prune.REV <-
+  prune.tree(regtree.REV, best = 10) # command for weakest link pruning, best = what size tree we want
+plot(prune.REV)
+text(prune.REV, pretty = 0, col = "Dark Blue")
+
+regtree.prune.pred <- predict(prune.REV, newdata = REV.test)
+mean((REV.test$HousePrice - regtree.prune.pred) ^ 2) # Marginal Improvement in MSE, 56.34469
+
+regtree.prune.r2 <-
+  1 - sum((REV.test$HousePrice - regtree.prune.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                             2)
+regtree.prune.r2 # = 0.6475803
+
+
+```
+
+### Bagging, Random Forests and Boosting ###
+
+# Bagging #
+```{r}
+
+set.seed(10)
+bagging.REV <-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 6,
+    importance = TRUE
+  ) # mtry = how many variables you want to try on each node, equal to 10 because 10 predictor variables in the data
+bagging.REV  # % var explained sort of like r-sqaured from linear regression
+pred.bagging <- predict(bagging.REV, newdata = REV.test)
+mean((REV.test$HousePrice - pred.bagging) ^ 2) # test MSE = 47.46447
+
+bagging.test1.r2 <-
+  1 - sum((REV.test$HousePrice - pred.bagging) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^                                                            2)
+bagging.test1.r2 # = 0.7031235
+
+importance(bagging.REV) # %IncMSE percentage amount MSE will increase on average if you remove the variable
+varImpPlot(bagging.REV)
+
+```
+
+
+# Random Forests #
+```{r}
+
+set.seed(10)
+rf0.REV <-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 5,
+    importance = TRUE
+  )
+pred.rf0 <- predict(rf0.REV, newdata = REV.test)
+mean((pred.rf0  - REV.test$HousePrice) ^ 2) # test MSE = 46.75659
+
+rf1.REV <-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 4,
+    importance = TRUE
+  )
+pred.rf1 <- predict(rf1.REV, newdata = REV.test)
+mean((pred.rf1  - REV.test$HousePrice) ^ 2) # test MSE = 44.79176
+
+rf2.REV <-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 3,
+    importance = TRUE
+  )
+pred.rf2 <- predict(rf2.REV, newdata = REV.test)
+mean((pred.rf2  - REV.test$HousePrice) ^ 2) # test MSE = 41.35314
+
+rf3.REV <-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 2,
+    importance = TRUE
+  )
+pred.rf3 <- predict(rf3.REV, newdata = REV.test)
+mean((pred.rf3  - REV.test$HousePrice) ^ 2) # test MSE = 40.31746 # Use this one #
+summary(rf3.REV)
+
+rf4.REV <-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 1,
+    importance = TRUE
+  )
+pred.rf4 <- predict(rf4.REV, newdata = REV.test)
+mean((pred.rf4  - REV.test$HousePrice) ^ 2) # test MSE = 41.30107
+
+rf3.REV.test <-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 2,
+    importance = TRUE
+  )
+pred.rf3.test <- predict(rf3.REV, newdata = REV.test)
+mean((pred.rf3.test  - REV.test$HousePrice) ^ 2) # test MSE = 40.31746 # Use this one #
+rf3.test.r2 <-
+  1 - sum((REV.test$HousePrice - pred.rf3) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                        2)
+rf3.test.r2 # = 0.7456565
+
+# test MSE # better performance because the random tree construction is very different and so variance is reduced because they are uncorrelated with each other and on average variance is lower
+# if we have all 10 variables are available the trees will look very similar whereas with fewer variables available in randomForest it can outperform bagging as variance is reduced by having more different trees
+
+rf3.REV
+importance(rf3.REV)
+varImpPlot(rf3.REV)
+```
+
+
+# Boosting #
+
+```{r}
+
+set.seed(10)
+
+lambda <- 10 ^ seq(from = -5, to = -0.5, by = 0.05) # shrinkage parameter
+test.error <- rep(-1, length(lambda))
+
+for (i in 1:length(lambda)) {
+  boosting.REV.train <-
+    gbm(
+      HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+      data = REV.train,
+      distribution = "gaussian",
+      n.trees = 1000,
+      shrinkage = lambda[i]
+    )
+  pred.boosting <-
+    predict(boosting.REV.train, REV.test, n.trees = 1000)
+  test.error[i] <- mean((pred.boosting - REV.test$HousePrice) ^ 2)
+}
+plot(lambda,
+     test.error,
+     type = "b",
+     xlab = "Lambda",
+     ylab = "Test MSE")
+
+bestlam.boosting <-
+  lambda[which.min(test.error)] # shrinkage parameter - lambda - corresponding to the minimum
+bestlam.boosting # minimum test MSE (Boosting) 4.721133
+boosting.REV <-
+  gbm(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    distribution = "gaussian",
+    n.trees = 1000,
+    shrinkage = bestlam.boosting
+  )
+pred.boosting <- predict(boosting.REV, REV.test, n.trees = 1000)
+
+mean((REV.test$HousePrice - pred.boosting) ^ 2)
+test.avg = mean(REV.test$HousePrice)
+boosting.test.r2 = 1 - mean((REV.test$HousePrice - pred.boosting) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                                2)
+boosting.test.r2
+
+```
+
+
+### Method Comparison ###
+
+# R-squared #
+```{r}
+
+par(mfrow = c(1, 1))
+test.avg = mean(REV.test$HousePrice)
+ln.test.avg = mean(REV.test$LnHousePrice)
+lm.test.r2 = 1 - mean((REV.test$HousePrice - lm.pred) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                    2)
+ln.test.r2 <-
+  1 - sum((REV.test$HousePrice - converted.back) ^ 2) / sum((REV.test$HousePrice - test.avg) ^
+                                                              2)
+ln.bestsubset.r2 <-
+  1 - sum((REV.test$LnHousePrice - lm.REV.bestsubset.test) ^ 2) / sum((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+ridge.test.r2 = 1 - mean((REV.test$LnHousePrice - ridge.pred1) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                             2)
+lasso.test.r2 = 1 - mean((REV.test$LnHousePrice - lasso.pred1) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                             2)
+pcr.test.r2 = 1 - mean((REV.test$LnHousePrice - pcr.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+pls.test.r2 = 1 - mean((REV.test$LnHousePrice - pls.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+gam.test.r2 = 1 - mean((REV.test$HousePrice - gam.pred) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                      2)
+regtree.test.r2 = 1 - mean((REV.test$HousePrice - regtree.prune.pred ) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                               2)
+bagging.test.r2 = 1 - mean((REV.test$HousePrice - pred.bagging) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                              2)
+randomforest.test.r2 = 1 - mean((REV.test$HousePrice - pred.rf3.test) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                               2)
+boosting.test.r2 = 1 - mean((REV.test$HousePrice - pred.boosting) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                                2)
+
+```
+
+```{r}
+
+R2.plot <-
+  barplot(
+    c(
+      lm.test.r2,
+      ln.test.r2,
+      ln.bestsubset.r2,
+      ridge.test.r2,
+      lasso.test.r2,
+      pcr.test.r2,
+      pls.test.r2,
+      gam.test.r2,
+      regtree.test.r2,
+      bagging.test.r2,
+      randomforest.test.r2,
+      boosting.test.r2
+    ),
+    col = "darkblue",
+    names.arg = c(
+      "OLS",
+      "LnOLS",
+      "Subset",
+      "Ridge",
+      "Lasso",
+      "PCR",
+      "PLS",
+      "GAM",
+      "RegTree",
+      "Bagging",
+      "RF",
+      "Boosting"
+    ),
+    main = "Test R-squared"
+  )
+```
+
+
+# MSE #
+```{r}
+
+lm.MSE <- mean((REV.test$HousePrice - lm.pred) ^ 2)
+ln.MSE <- mean((REV.test$HousePrice - (exp(ln.pred))) ^ 2)
+ln.bestsubset.MSE <-
+  mean((REV.test$HousePrice - (exp(
+    lm.REV.bestsubset.test
+  ))) ^ 2)
+ridge.MSE <- mean((REV.test$HousePrice - (exp(ridge.pred1))) ^ 2)
+lasso.MSE <- mean((REV.test$HousePrice - (exp(lasso.pred1))) ^ 2)
+pcr.MSE <- mean((REV.test$HousePrice - (exp(pcr.pred))) ^ 2)
+pls.MSE <- mean((REV.test$HousePrice - (exp(pls.pred))) ^ 2)
+gam.MSE <- mean((REV.test$HousePrice - gam.pred) ^ 2)
+regtree.MSE <- mean((REV.test$HousePrice - regtree.prune.pred) ^ 2)
+bagging.MSE <- mean((REV.test$HousePrice - pred.bagging) ^ 2)
+randomforest.MSE <- mean((REV.test$HousePrice - pred.rf3.test) ^ 2)
+boosting.MSE <- mean((REV.test$HousePrice - pred.boosting) ^ 2)
+MSE.plot <-
+  barplot(
+    c(
+      lm.MSE,
+      ln.MSE,
+      ln.bestsubset.MSE,
+      ridge.MSE,
+      lasso.MSE,
+      pcr.MSE,
+      pls.MSE,
+      gam.MSE,
+      regtree.MSE,
+      bagging.MSE,
+      randomforest.MSE,
+      boosting.MSE
+    ),
+    col = "red",
+    names.arg = c(
+      "OLS",
+      "LnOLS",
+      "Subset",
+      "Ridge",
+      "Lasso",
+      "PCR",
+      "PLS",
+      "GAM",
+      "RegTree",
+      "Bagging",
+      "RF",
+      "Boosting"
+    ),
+    main = "Test MSE"
+  )
+
+```

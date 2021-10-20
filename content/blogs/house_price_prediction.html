@@ -1,0 +1,2607 @@
+---
+categories:  
+- ""    #the front matter should be like the one found in, e.g., blog2.md. It cannot be like the normal Rmd we used
+- ""
+date: "2021-10-20"
+description: Prediction of House Prices in New Taipei City, Taiwan # the title that will show up once someone gets to this page
+draft: false
+image: Exeter.jpg # save picture in \static\img\blogs. Acceptable formats= jpg, jpeg, or png . Your iPhone pics wont work
+
+keywords: ""
+slug: house_price_prediction # slug is the shorthand URL address... no spaces plz
+title: Machine Learning Project
+---
+
+
+
+<div id="final-assignment" class="section level1">
+<h1>Final Assignment</h1>
+<p>rm(list = ls())</p>
+<pre class="r"><code>rm(list = ls())
+library(MASS)
+library(ISLR)
+library(tree)
+library(randomForest)</code></pre>
+<pre><code>## randomForest 4.6-14</code></pre>
+<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre class="r"><code>library(gbm)</code></pre>
+<pre><code>## Loaded gbm 2.1.8</code></pre>
+<pre class="r"><code>library(glmnet)</code></pre>
+<pre><code>## Loading required package: Matrix</code></pre>
+<pre><code>## Loaded glmnet 4.0-2</code></pre>
+<pre class="r"><code>library(car)</code></pre>
+<pre><code>## Loading required package: carData</code></pre>
+<pre class="r"><code>library(leaps)
+library(pls)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;pls&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:stats&#39;:
+## 
+##     loadings</code></pre>
+<pre class="r"><code>library(boot)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;boot&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:car&#39;:
+## 
+##     logit</code></pre>
+<pre class="r"><code>library(leaps)
+library(splines)
+library(gam)</code></pre>
+<pre><code>## Loading required package: foreach</code></pre>
+<pre><code>## Loaded gam 1.20</code></pre>
+<pre class="r"><code>library(Hmisc)</code></pre>
+<pre><code>## Loading required package: lattice</code></pre>
+<pre><code>## 
+## Attaching package: &#39;lattice&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:boot&#39;:
+## 
+##     melanoma</code></pre>
+<pre><code>## Loading required package: survival</code></pre>
+<pre><code>## 
+## Attaching package: &#39;survival&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:boot&#39;:
+## 
+##     aml</code></pre>
+<pre><code>## Loading required package: Formula</code></pre>
+<pre><code>## Loading required package: ggplot2</code></pre>
+<pre><code>## 
+## Attaching package: &#39;ggplot2&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:randomForest&#39;:
+## 
+##     margin</code></pre>
+<pre><code>## 
+## Attaching package: &#39;Hmisc&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     format.pval, units</code></pre>
+<pre class="r"><code># Adding the labour data set to RStudio
+library(readxl)
+RealEstateValuation_Data_ &lt;-
+  read_excel(here::here(&quot;data&quot;,&quot;Real estate valuation data set.xlsx&quot;))
+View(RealEstateValuation_Data_)</code></pre>
+<pre class="r"><code>#renaming the variables so its easier to call upon in code
+RealEstateValuation_Data_$TransactionDate &lt;-
+  (RealEstateValuation_Data_$`X1 transaction date`)
+
+RealEstateValuation_Data_$HouseAge &lt;-
+  (RealEstateValuation_Data_$`X2 house age`)
+
+RealEstateValuation_Data_$MRTDist &lt;-
+  (RealEstateValuation_Data_$`X3 distance to the nearest MRT station`)
+
+RealEstateValuation_Data_$StoreNum &lt;-
+  (RealEstateValuation_Data_$`X4 number of convenience stores`)
+
+RealEstateValuation_Data_$Latitude &lt;-
+  (RealEstateValuation_Data_$`X5 latitude`)
+
+RealEstateValuation_Data_$Longitude &lt;-
+  (RealEstateValuation_Data_$`X6 longitude`)
+
+RealEstateValuation_Data_$HousePrice &lt;-
+  (RealEstateValuation_Data_$`Y house price of unit area`)
+
+RealEstateValuation_Data_$LnHousePrice &lt;-
+  log(RealEstateValuation_Data_$`Y house price of unit area`)</code></pre>
+<pre class="r"><code>#Getting rid of original column, as to not have duplicates
+RealEstateValuation_Data_$`X1 transaction date` = NULL
+RealEstateValuation_Data_$`X2 house age` = NULL
+RealEstateValuation_Data_$`X3 distance to the nearest MRT station` = NULL
+RealEstateValuation_Data_$`X4 number of convenience stores` = NULL
+RealEstateValuation_Data_$`X5 latitude` = NULL
+RealEstateValuation_Data_$`X6 longitude` = NULL
+RealEstateValuation_Data_$`Y house price of unit area` = NULL
+
+View(RealEstateValuation_Data_)</code></pre>
+<p>###Data and Exploratory Analysis ###</p>
+<pre class="r"><code>describe(RealEstateValuation_Data_) #gives us: the top 5 max values, bottom 5 minimum values, mean, quantiles, observations, missing observations.</code></pre>
+<pre><code>## RealEstateValuation_Data_ 
+## 
+##  9  Variables      414  Observations
+## --------------------------------------------------------------------------------
+## No 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0      414        1    207.5    138.3    21.65    42.30 
+##      .25      .50      .75      .90      .95 
+##   104.25   207.50   310.75   372.70   393.35 
+## 
+## lowest :   1   2   3   4   5, highest: 410 411 412 413 414
+## --------------------------------------------------------------------------------
+## TransactionDate 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0       12    0.991     2013   0.3239     2013     2013 
+##      .25      .50      .75      .90      .95 
+##     2013     2013     2013     2014     2014 
+## 
+## lowest : 2012.667 2012.750 2012.833 2012.917 2013.000
+## highest: 2013.250 2013.333 2013.417 2013.500 2013.583
+##                                                                          
+## Value      2012.667 2012.750 2012.833 2012.917 2013.000 2013.083 2013.167
+## Frequency        30       27       31       38       28       46       25
+## Proportion    0.072    0.065    0.075    0.092    0.068    0.111    0.060
+##                                                        
+## Value      2013.250 2013.333 2013.417 2013.500 2013.583
+## Frequency        32       29       58       47       23
+## Proportion    0.077    0.070    0.140    0.114    0.056
+## --------------------------------------------------------------------------------
+## HouseAge 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0      236        1    17.71    12.93    1.100    3.500 
+##      .25      .50      .75      .90      .95 
+##    9.025   16.100   28.150   34.670   37.735 
+## 
+## lowest :  0.0  1.0  1.1  1.5  1.7, highest: 40.9 41.3 41.4 42.7 43.8
+## --------------------------------------------------------------------------------
+## MRTDist 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0      259        1     1084     1205    90.46   157.61 
+##      .25      .50      .75      .90      .95 
+##   289.32   492.23  1454.28  2697.66  4082.01 
+## 
+## lowest :   23.38284   49.66105   56.47425   57.58945   82.88643
+## highest: 4605.74900 5512.03800 6306.15300 6396.28300 6488.02100
+## --------------------------------------------------------------------------------
+## StoreNum 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0       11    0.986    4.094    3.371        0        0 
+##      .25      .50      .75      .90      .95 
+##        1        4        6        8        9 
+## 
+## lowest :  0  1  2  3  4, highest:  6  7  8  9 10
+##                                                                             
+## Value          0     1     2     3     4     5     6     7     8     9    10
+## Frequency     67    46    24    46    31    67    37    31    30    25    10
+## Proportion 0.162 0.111 0.058 0.111 0.075 0.162 0.089 0.075 0.072 0.060 0.024
+## --------------------------------------------------------------------------------
+## Latitude 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0      234        1    24.97  0.01382    24.95    24.95 
+##      .25      .50      .75      .90      .95 
+##    24.96    24.97    24.98    24.98    24.99 
+## 
+## lowest : 24.93207 24.93293 24.93363 24.93885 24.94155
+## highest: 24.99156 24.99176 24.99800 25.00115 25.01459
+## --------------------------------------------------------------------------------
+## Longitude 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0      232        1    121.5  0.01601    121.5    121.5 
+##      .25      .50      .75      .90      .95 
+##    121.5    121.5    121.5    121.5    121.5 
+## 
+## lowest : 121.4735 121.4752 121.4788 121.4846 121.4951
+## highest: 121.5539 121.5548 121.5596 121.5617 121.5663
+## --------------------------------------------------------------------------------
+## HousePrice 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0      270        1    37.98    15.13    16.49    21.02 
+##      .25      .50      .75      .90      .95 
+##    27.70    38.45    46.60    54.94    59.17 
+## 
+## lowest :   7.6  11.2  11.6  12.2  12.8, highest:  71.0  73.6  78.0  78.3 117.5
+## --------------------------------------------------------------------------------
+## LnHousePrice 
+##        n  missing distinct     Info     Mean      Gmd      .05      .10 
+##      414        0      270        1    3.567   0.4338    2.803    3.045 
+##      .25      .50      .75      .90      .95 
+##    3.321    3.649    3.842    4.006    4.080 
+## 
+## lowest : 2.028148 2.415914 2.451005 2.501436 2.549445
+## highest: 4.262680 4.298645 4.356709 4.360548 4.766438
+## --------------------------------------------------------------------------------</code></pre>
+<pre class="r"><code># Correlation Matrix
+cor(RealEstateValuation_Data_) #The most correlated with HousePrice: MRTDist (negative), StoreNum (positive), Latitude (positive), longitude (positive).</code></pre>
+<pre><code>##                          No TransactionDate    HouseAge     MRTDist
+## No               1.00000000    -0.048634447 -0.03280811 -0.01357349
+## TransactionDate -0.04863445     1.000000000  0.01754234  0.06088009
+## HouseAge        -0.03280811     0.017542341  1.00000000  0.02562205
+## MRTDist         -0.01357349     0.060880095  0.02562205  1.00000000
+## StoreNum        -0.01269895     0.009544199  0.04959251 -0.60251914
+## Latitude        -0.01010966     0.035016305  0.05441990 -0.59106657
+## Longitude       -0.01105928    -0.041065078 -0.04852005 -0.80631677
+## HousePrice      -0.02858717     0.087529272 -0.21056705 -0.67361286
+## LnHousePrice    -0.01644544     0.075495103 -0.18925434 -0.75233739
+##                     StoreNum    Latitude   Longitude  HousePrice LnHousePrice
+## No              -0.012698946 -0.01010966 -0.01105928 -0.02858717  -0.01644544
+## TransactionDate  0.009544199  0.03501631 -0.04106508  0.08752927   0.07549510
+## HouseAge         0.049592513  0.05441990 -0.04852005 -0.21056705  -0.18925434
+## MRTDist         -0.602519145 -0.59106657 -0.80631677 -0.67361286  -0.75233739
+## StoreNum         1.000000000  0.44414331  0.44909901  0.57100491   0.59882627
+## Latitude         0.444143306  1.00000000  0.41292394  0.54630665   0.61797918
+## Longitude        0.449099007  0.41292394  1.00000000  0.52328651   0.59448060
+## HousePrice       0.571004911  0.54630665  0.52328651  1.00000000   0.96205720
+## LnHousePrice     0.598826265  0.61797918  0.59448060  0.96205720   1.00000000</code></pre>
+<pre class="r"><code>pairs(HousePrice ~ TransactionDate + MRTDist + StoreNum + Latitude + Longitude,
+      data = RealEstateValuation_Data_)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<pre class="r"><code>#Scatterplots of HousePrice with the explanatory variables to ascertain an idea of a functional form.
+par(mfrow = c(1, 1))
+
+plot(
+  RealEstateValuation_Data_$`TransactionDate`,
+  RealEstateValuation_Data_$HousePrice
+)
+lines(
+  RealEstateValuation_Data_$`TransactionDate`,
+  predict(
+    lm(HousePrice ~ TransactionDate, data = RealEstateValuation_Data_)
+  ),
+  type = &quot;l&quot;,
+  col = &quot;orange1&quot;,
+  lwd = 2
+)
+title(&quot;Figure 1&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<pre class="r"><code>plot(RealEstateValuation_Data_$`HouseAge`,
+     RealEstateValuation_Data_$HousePrice) #Looks like a non-linear relationship. Different model may increase R squared.
+lines(
+  RealEstateValuation_Data_$`HouseAge`,
+  predict(lm(HousePrice ~ HouseAge, data = RealEstateValuation_Data_)),
+  type = &quot;l&quot;,
+  col = &quot;orange1&quot;,
+  lwd = 2
+)
+title(&quot;Figure 2&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-2.png" width="672" /></p>
+<pre class="r"><code>plot(x = RealEstateValuation_Data_$MRTDist, y = RealEstateValuation_Data_$HousePrice) #Looks like a non-linear relationship - different method likely to increase R squared.
+lines(
+  RealEstateValuation_Data_$MRTDist,
+  predict(lm(HousePrice ~ MRTDist, data = RealEstateValuation_Data_)),
+  type = &quot;l&quot;,
+  col = &quot;orange1&quot;,
+  lwd = 2
+)
+title(&quot;Figure 3&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-3.png" width="672" /></p>
+<pre class="r"><code>hist(RealEstateValuation_Data_$&#39;MRTDist&#39;, main = paste(&quot;Figure 4&quot;))</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-4.png" width="672" /></p>
+<pre class="r"><code>plot(RealEstateValuation_Data_$StoreNum,
+     RealEstateValuation_Data_$HousePrice) #Looks like a linear model fits it well.
+lines(
+  RealEstateValuation_Data_$StoreNum,
+  predict(lm(HousePrice ~ StoreNum, data = RealEstateValuation_Data_)),
+  type = &quot;l&quot;,
+  col = &quot;orange1&quot;,
+  lwd = 2
+)
+title(&quot;Figure 5&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-5.png" width="672" /></p>
+<pre class="r"><code>hist(RealEstateValuation_Data_$`StoreNum`, main = paste(&quot;Figure 6&quot;))</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-6.png" width="672" /></p>
+<pre class="r"><code>plot(RealEstateValuation_Data_$Latitude,
+     RealEstateValuation_Data_$Longitude,
+     data = RealEstateValuation_Data_)</code></pre>
+<pre><code>## Warning in plot.window(...): &quot;data&quot; is not a graphical parameter</code></pre>
+<pre><code>## Warning in plot.xy(xy, type, ...): &quot;data&quot; is not a graphical parameter</code></pre>
+<pre><code>## Warning in axis(side = side, at = at, labels = labels, ...): &quot;data&quot; is not a
+## graphical parameter
+
+## Warning in axis(side = side, at = at, labels = labels, ...): &quot;data&quot; is not a
+## graphical parameter</code></pre>
+<pre><code>## Warning in box(...): &quot;data&quot; is not a graphical parameter</code></pre>
+<pre><code>## Warning in title(...): &quot;data&quot; is not a graphical parameter</code></pre>
+<pre class="r"><code>title(&quot;Figure 7&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-7.png" width="672" /></p>
+<pre class="r"><code>plot(RealEstateValuation_Data_$`Latitude`,
+     RealEstateValuation_Data_$HousePrice)
+lines(
+  RealEstateValuation_Data_$`Latitude`,
+  predict(lm(HousePrice ~ Latitude, data = RealEstateValuation_Data_)),
+  type = &quot;l&quot;,
+  col = &quot;orange1&quot;,
+  lwd = 2
+)
+title(&quot;Figure 8&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-8.png" width="672" /></p>
+<pre class="r"><code>plot(RealEstateValuation_Data_$`Longitude`,
+     RealEstateValuation_Data_$HousePrice)
+lines(
+  RealEstateValuation_Data_$`Longitude`,
+  predict(lm(HousePrice ~ Longitude, data = RealEstateValuation_Data_)),
+  type = &quot;l&quot;,
+  col = &quot;orange1&quot;,
+  lwd = 2
+)
+title(&quot;Figure 9&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-6-9.png" width="672" /></p>
+<pre class="r"><code>#Simple linear regression to determine explanatory power by individual variables on house price (in linear form).
+
+sm.trans = lm(HousePrice ~ TransactionDate, data = RealEstateValuation_Data_)
+summary(sm.trans) #very insignificant p-value rejected at 5% significance</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ TransactionDate, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -31.159 -10.082   0.923   8.528  78.741 
+## 
+## Coefficients:
+##                  Estimate Std. Error t value Pr(&gt;|t|)  
+## (Intercept)     -8464.260   4767.178  -1.776   0.0765 .
+## TransactionDate     4.223      2.368   1.783   0.0752 .
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 13.57 on 412 degrees of freedom
+## Multiple R-squared:  0.007661,   Adjusted R-squared:  0.005253 
+## F-statistic: 3.181 on 1 and 412 DF,  p-value: 0.07524</code></pre>
+<pre class="r"><code>sm.age = lm(HousePrice ~ HouseAge, data = RealEstateValuation_Data_)
+summary(sm.age) #Not much explanatory power - R squared is 0.04434 but P-value is significant at all levels.</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ HouseAge, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -31.113 -10.738   1.626   8.199  77.781 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept) 42.43470    1.21098  35.042  &lt; 2e-16 ***
+## HouseAge    -0.25149    0.05752  -4.372 1.56e-05 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 13.32 on 412 degrees of freedom
+## Multiple R-squared:  0.04434,    Adjusted R-squared:  0.04202 
+## F-statistic: 19.11 on 1 and 412 DF,  p-value: 1.56e-05</code></pre>
+<pre class="r"><code>sm.MRT = lm(HousePrice ~ MRTDist, data = RealEstateValuation_Data_)
+summary(sm.MRT) #High explanatory power - R squared is 0.4538, P-value significant at all levels.</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ MRTDist, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -35.396  -6.007  -1.195   4.831  73.483 
+## 
+## Coefficients:
+##               Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept) 45.8514271  0.6526105   70.26   &lt;2e-16 ***
+## MRTDist     -0.0072621  0.0003925  -18.50   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 10.07 on 412 degrees of freedom
+## Multiple R-squared:  0.4538, Adjusted R-squared:  0.4524 
+## F-statistic: 342.2 on 1 and 412 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>sm.store = lm(HousePrice ~ StoreNum, data = RealEstateValuation_Data_)
+summary(sm.store) # High explanatory power - R squared is 0.326, P-value significant at all levels.</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ StoreNum, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -35.407  -7.341  -1.788   5.984  87.681 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)  27.1811     0.9419   28.86   &lt;2e-16 ***
+## StoreNum      2.6377     0.1868   14.12   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 11.18 on 412 degrees of freedom
+## Multiple R-squared:  0.326,  Adjusted R-squared:  0.3244 
+## F-statistic: 199.3 on 1 and 412 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>sm.lat = lm(HousePrice ~ Latitude, data = RealEstateValuation_Data_)
+summary(sm.lat) #Reasonably high explanatory power - R squared is 0.2985, P-value is significant at all levels.</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ Latitude, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -37.969  -7.347  -1.392   5.685  76.184 
+## 
+## Coefficients:
+##              Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept) -14917.68    1129.66  -13.21   &lt;2e-16 ***
+## Latitude       598.97      45.24   13.24   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 11.41 on 412 degrees of freedom
+## Multiple R-squared:  0.2985, Adjusted R-squared:  0.2967 
+## F-statistic: 175.3 on 1 and 412 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>sm.long = lm(HousePrice ~ Longitude, data = RealEstateValuation_Data_)
+summary(sm.long) #Reasonably high explanatory power - R squared is 0.2738, P-value is significant at all levels.</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ Longitude, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -32.588  -5.693  -0.417   6.157  80.866 
+## 
+## Coefficients:
+##              Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept) -56345.57    4523.60  -12.46   &lt;2e-16 ***
+## Longitude      463.93      37.22   12.46   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 11.61 on 412 degrees of freedom
+## Multiple R-squared:  0.2738, Adjusted R-squared:  0.2721 
+## F-statistic: 155.4 on 1 and 412 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>par(mfrow = c(2, 2))
+hist(RealEstateValuation_Data_$`HouseAge`)
+hist(RealEstateValuation_Data_$&#39;MRTDist&#39;)
+hist(RealEstateValuation_Data_$`TransactionDate`)
+hist(RealEstateValuation_Data_$`StoreNum`)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<pre class="r"><code>par(mfrow = c(1, 1))
+boxplot.Price.Store &lt;-
+  boxplot(HousePrice ~ StoreNum, data = RealEstateValuation_Data_)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-7-2.png" width="672" /></p>
+<pre class="r"><code>boxplot.Price.Store$stats</code></pre>
+<pre><code>##       [,1] [,2]  [,3]  [,4]  [,5]  [,6] [,7] [,8]  [,9] [,10] [,11]
+## [1,] 11.60 11.2 20.90 17.70 21.80 22.80 30.5 30.0 26.50  32.4 44.00
+## [2,] 17.45 24.7 25.30 23.60 32.35 39.35 40.6 40.4 39.50  42.2 46.10
+## [3,] 22.30 28.7 30.65 28.25 37.40 44.50 45.7 42.0 42.75  50.8 47.55
+## [4,] 37.45 37.4 36.80 32.10 40.30 51.75 51.0 48.3 48.20  58.1 49.80
+## [5,] 55.30 52.2 50.50 40.80 47.00 60.70 63.3 57.4 57.80  78.3 54.40</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 1))
+plot(RealEstateValuation_Data_$Latitude,
+     RealEstateValuation_Data_$Longitude,
+     data = RealEstateValuation_Data_)</code></pre>
+<pre><code>## Warning in plot.window(...): &quot;data&quot; is not a graphical parameter</code></pre>
+<pre><code>## Warning in plot.xy(xy, type, ...): &quot;data&quot; is not a graphical parameter</code></pre>
+<pre><code>## Warning in axis(side = side, at = at, labels = labels, ...): &quot;data&quot; is not a
+## graphical parameter
+
+## Warning in axis(side = side, at = at, labels = labels, ...): &quot;data&quot; is not a
+## graphical parameter</code></pre>
+<pre><code>## Warning in box(...): &quot;data&quot; is not a graphical parameter</code></pre>
+<pre><code>## Warning in title(...): &quot;data&quot; is not a graphical parameter</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-7-3.png" width="672" /></p>
+<pre class="r"><code>hist(RealEstateValuation_Data_$HousePrice)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-7-4.png" width="672" /></p>
+<div id="machine-learning-methods" class="section level3">
+<h3>Machine Learning Methods</h3>
+<pre class="r"><code># Separating the data into train &amp; test, decide on the method
+set.seed(10)
+train &lt;-
+  sample(1:289, 289) # Taking the first 289 observations(70% of the data for training)
+REV.train &lt;- RealEstateValuation_Data_[train, ] # 289 obvs
+REV.test &lt;- RealEstateValuation_Data_[-train, ] # 125 obvs</code></pre>
+</div>
+<div id="multiple-linear-regression" class="section level2">
+<h2>Multiple linear regression</h2>
+<pre class="r"><code>set.seed(10)
+lm.REV &lt;-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+     data = RealEstateValuation_Data_)
+summary(lm.REV)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude + Longitude, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -35.667  -5.412  -0.967   4.217  75.190 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -1.444e+04  6.775e+03  -2.132  0.03364 *  
+## TransactionDate  5.149e+00  1.557e+00   3.307  0.00103 ** 
+## HouseAge        -2.697e-01  3.853e-02  -7.000 1.06e-11 ***
+## MRTDist         -4.488e-03  7.180e-04  -6.250 1.04e-09 ***
+## StoreNum         1.133e+00  1.882e-01   6.023 3.83e-09 ***
+## Latitude         2.255e+02  4.457e+01   5.059 6.38e-07 ***
+## Longitude       -1.243e+01  4.858e+01  -0.256  0.79820    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 8.858 on 407 degrees of freedom
+## Multiple R-squared:  0.5824, Adjusted R-squared:  0.5762 
+## F-statistic:  94.6 on 6 and 407 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>#Diagnostic Plots
+par(mfrow = c(2, 2))
+plot(lm.REV)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<pre class="r"><code># Outliers &amp; High Leverage Points
+index.outlier &lt;- which(rstudent(lm.REV) &gt; 3 | rstudent(lm.REV) &lt; -3)
+length(index.outlier) # number of outliers = 7</code></pre>
+<pre><code>## [1] 7</code></pre>
+<pre class="r"><code>average_leverage &lt;- 7 / 414
+index.highlev &lt;- which(hatvalues(lm.REV) &gt; average_leverage * 3)
+length(index.highlev) # number of high leverage points = 11</code></pre>
+<pre><code>## [1] 11</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 1))
+plot(hatvalues(lm.REV))</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-10-2.png" width="672" /></p>
+<pre class="r"><code># Variation Inflation Factor
+vif(lm.REV) # House Age has the lowest VIF value of 1.014287 and MRTDist has the highest of 4.323019. As none of the VIF scores are above 5 one can infer that no significant multi-collinearity exists between the variables. MRTDist is likely to share some collinearity with Latitude and Longitude due to the nature of MRT station distribution around the city, however as stated this report doesn’t consider collinearity to be a noticeable problem. </code></pre>
+<pre><code>## TransactionDate        HouseAge         MRTDist        StoreNum        Latitude 
+##        1.014655        1.014287        4.322984        1.617021        1.610225 
+##       Longitude 
+##        2.926305</code></pre>
+<pre class="r"><code>lm.REV.train &lt;-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+     data = REV.train)
+summary(lm.REV.train)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude + Longitude, data = REV.train)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -35.286  -5.087  -0.628   4.212  74.789 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -1.387e+04  8.987e+03  -1.544   0.1238    
+## TransactionDate  4.596e+00  1.951e+00   2.355   0.0192 *  
+## HouseAge        -3.021e-01  4.820e-02  -6.268 1.37e-09 ***
+## MRTDist         -4.222e-03  9.509e-04  -4.440 1.29e-05 ***
+## StoreNum         1.101e+00  2.397e-01   4.595 6.54e-06 ***
+## Latitude         2.645e+02  5.560e+01   4.757 3.14e-06 ***
+## Longitude       -1.597e+01  6.512e+01  -0.245   0.8065    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 9.209 on 282 degrees of freedom
+## Multiple R-squared:  0.5764, Adjusted R-squared:  0.5674 
+## F-statistic: 63.95 on 6 and 282 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>lm.pred &lt;- predict(lm.REV.train, REV.test)
+
+mean((lm.pred - REV.test$HousePrice) ^ 2)</code></pre>
+<pre><code>## [1] 65.24426</code></pre>
+<pre class="r"><code>lm.test.r2 &lt;-
+  1 - sum((REV.test$HousePrice - lm.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^2)
+lm.test.r2 # 0.5919161</code></pre>
+<pre><code>## [1] 0.5919161</code></pre>
+<pre class="r"><code># Introduce during Best Subset #
+lm.REV2 &lt;-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude,
+     data = RealEstateValuation_Data_)
+summary(lm.REV2) # R-sqaured 0.5823, RSE = 8.847</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -35.625  -5.373  -1.020   4.243  75.343 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -1.596e+04  3.233e+03  -4.938 1.15e-06 ***
+## TransactionDate  5.138e+00  1.554e+00   3.305  0.00103 ** 
+## HouseAge        -2.694e-01  3.847e-02  -7.003 1.04e-11 ***
+## MRTDist         -4.353e-03  4.899e-04  -8.887  &lt; 2e-16 ***
+## StoreNum         1.136e+00  1.876e-01   6.056 3.17e-09 ***
+## Latitude         2.269e+02  4.417e+01   5.136 4.35e-07 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 8.847 on 408 degrees of freedom
+## Multiple R-squared:  0.5823, Adjusted R-squared:  0.5772 
+## F-statistic: 113.8 on 5 and 408 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>mean(lm.REV2$residuals ^ 2) # MSE = 77.14143</code></pre>
+<pre><code>## [1] 77.14143</code></pre>
+<pre class="r"><code>anova(lm.REV, lm.REV2) # P-value very high meaning models are very similar, therefore second model better. One less variable and better adj R-squared.</code></pre>
+<pre><code>## Analysis of Variance Table
+## 
+## Model 1: HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + 
+##     Latitude + Longitude
+## Model 2: HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + 
+##     Latitude
+##   Res.Df   RSS Df Sum of Sq      F Pr(&gt;F)
+## 1    407 31931                           
+## 2    408 31937 -1   -5.1353 0.0655 0.7982</code></pre>
+<pre class="r"><code>plot(lm.REV2)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-12-1.png" width="672" /><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-12-2.png" width="672" /><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-12-3.png" width="672" /><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-12-4.png" width="672" /></p>
+<pre class="r"><code>lm.REV2.train &lt;-
+  lm(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude,
+     data = REV.train)
+summary(lm.REV2.train) # R-squared = 0.5826, RSE = 8.957</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude, data = REV.train)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -35.232  -4.997  -0.719   4.399  74.998 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -1.584e+04  4.011e+03  -3.950 9.88e-05 ***
+## TransactionDate  4.590e+00  1.948e+00   2.356   0.0191 *  
+## HouseAge        -3.017e-01  4.809e-02  -6.274 1.32e-09 ***
+## MRTDist         -4.043e-03  6.079e-04  -6.651 1.50e-10 ***
+## StoreNum         1.107e+00  2.382e-01   4.647 5.17e-06 ***
+## Latitude         2.662e+02  5.510e+01   4.831 2.23e-06 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 9.193 on 283 degrees of freedom
+## Multiple R-squared:  0.5763, Adjusted R-squared:  0.5688 
+## F-statistic: 76.99 on 5 and 283 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code># Taking the natural logarithm of house price and testing it
+set.seed(10)
+ln.REV &lt;-
+  lm(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude +
+      Longitude,
+    data = RealEstateValuation_Data_
+  )
+summary(ln.REV) # R-squared = 0.6857, RSE = 0.2214</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = LnHousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude + Longitude, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.68101 -0.11493 -0.00265  0.11538  1.04844 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -5.117e+02  1.695e+02  -3.018 0.002700 ** 
+## TransactionDate  1.355e-01  3.895e-02   3.478 0.000559 ***
+## HouseAge        -6.967e-03  9.641e-04  -7.227 2.46e-12 ***
+## MRTDist         -1.455e-04  1.797e-05  -8.098 6.54e-15 ***
+## StoreNum         2.775e-02  4.708e-03   5.894 7.92e-09 ***
+## Latitude         7.925e+00  1.115e+00   7.107 5.35e-12 ***
+## Longitude        3.687e-01  1.216e+00   0.303 0.761828    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 0.2216 on 407 degrees of freedom
+## Multiple R-squared:  0.6858, Adjusted R-squared:  0.6811 
+## F-statistic:   148 on 6 and 407 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>ln.fit &lt;-
+  lm(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude +
+      Longitude,
+    data = REV.train
+  )
+summary(ln.fit) # R-sqaured = 0.6984, RSE = 0.2227</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = LnHousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude + Longitude, data = REV.train)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1.67143 -0.10965  0.00671  0.10732  1.04828 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -5.199e+02  2.253e+02  -2.307  0.02176 *  
+## TransactionDate  1.313e-01  4.892e-02   2.684  0.00772 ** 
+## HouseAge        -7.624e-03  1.208e-03  -6.308 1.09e-09 ***
+## MRTDist         -1.363e-04  2.384e-05  -5.718 2.74e-08 ***
+## StoreNum         2.855e-02  6.010e-03   4.750 3.24e-06 ***
+## Latitude         8.855e+00  1.394e+00   6.352 8.51e-10 ***
+## Longitude        3.149e-01  1.633e+00   0.193  0.84721    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 0.2309 on 282 degrees of freedom
+## Multiple R-squared:  0.6796, Adjusted R-squared:  0.6727 
+## F-statistic: 99.67 on 6 and 282 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>ln.pred &lt;- predict(ln.fit, REV.test)
+converted.back &lt;- exp(ln.pred)
+View(converted.back)
+mean((converted.back - REV.test$HousePrice) ^ 2) #MSE = 61.56653</code></pre>
+<pre><code>## [1] 61.56653</code></pre>
+<pre class="r"><code>ln.test.r2 &lt;-
+  1 - sum((REV.test$HousePrice - converted.back) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                              2)
+ln.test.r2 # 0.6149192</code></pre>
+<pre><code>## [1] 0.6149192</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 1))
+hist(RealEstateValuation_Data_$HousePrice, main = paste(&quot;Figure 7&quot;))</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<pre class="r"><code>hist(RealEstateValuation_Data_$&#39;LnHousePrice&#39;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-13-2.png" width="672" /></p>
+</div>
+<div id="subset-selection" class="section level2">
+<h2>Subset selection</h2>
+<pre class="r"><code># Best Subset Selection #
+reg.full &lt;-
+  regsubsets(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = RealEstateValuation_Data_,
+    nvmax = 6
+  )
+reg.summary &lt;- summary(reg.full)
+reg.summary</code></pre>
+<pre><code>## Subset selection object
+## Call: regsubsets.formula(LnHousePrice ~ TransactionDate + HouseAge + 
+##     MRTDist + StoreNum + Latitude + Longitude, data = RealEstateValuation_Data_, 
+##     nvmax = 6)
+## 6 Variables  (and intercept)
+##                 Forced in Forced out
+## TransactionDate     FALSE      FALSE
+## HouseAge            FALSE      FALSE
+## MRTDist             FALSE      FALSE
+## StoreNum            FALSE      FALSE
+## Latitude            FALSE      FALSE
+## Longitude           FALSE      FALSE
+## 1 subsets of each size up to 6
+## Selection Algorithm: exhaustive
+##          TransactionDate HouseAge MRTDist StoreNum Latitude Longitude
+## 1  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot; &quot;      &quot; &quot;      &quot; &quot;      
+## 2  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot; &quot;      &quot;*&quot;      &quot; &quot;      
+## 3  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot; &quot;      &quot;*&quot;      &quot; &quot;      
+## 4  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 5  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 6  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot;*&quot;</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 3))
+# Cp = 5 variable model best
+plot(reg.summary$cp,
+     xlab = &quot;No. of variables&quot;,
+     ylab = &quot;Cp&quot;,
+     type = &quot;l&quot;)
+points(
+  which.min(reg.summary$cp),
+  reg.summary$cp[which.min(reg.summary$cp)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)
+# BIC = 5 variable model best
+plot(reg.summary$bic,
+     xlab = &quot;No. of variables&quot;,
+     ylab = &quot;BIC&quot;,
+     type = &quot;l&quot;)
+points(
+  which.min(reg.summary$bic),
+  reg.summary$bic[which.min(reg.summary$bic)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)
+# Adj- R2 = 5 variable model best
+plot(reg.summary$adjr2,
+     xlab = &quot;No. of variables&quot;,
+     ylab = &quot;Adj. R2&quot;,
+     type = &quot;l&quot;)
+points(
+  which.max(reg.summary$adjr2),
+  reg.summary$adjr2[which.max(reg.summary$adjr2)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-14-1.png" width="672" /></p>
+<pre class="r"><code>coef(reg.full, 5) # Best subset is with 5 variables #</code></pre>
+<pre><code>##     (Intercept) TransactionDate        HouseAge         MRTDist        StoreNum 
+##   -4.665529e+02    1.358373e-01   -6.976565e-03   -1.494696e-04    2.766358e-02 
+##        Latitude 
+##    7.883011e+00</code></pre>
+</div>
+</div>
+<div id="forward-stepwise-selection" class="section level1">
+<h1>Forward Stepwise Selection</h1>
+<pre class="r"><code>reg.fwd &lt;-
+  regsubsets(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    nvmax = 6,
+    method = &quot;forward&quot;
+  )
+reg.summary.fwd &lt;- summary(reg.fwd)
+reg.summary.fwd</code></pre>
+<pre><code>## Subset selection object
+## Call: regsubsets.formula(LnHousePrice ~ TransactionDate + HouseAge + 
+##     MRTDist + StoreNum + Latitude + Longitude, data = REV.train, 
+##     nvmax = 6, method = &quot;forward&quot;)
+## 6 Variables  (and intercept)
+##                 Forced in Forced out
+## TransactionDate     FALSE      FALSE
+## HouseAge            FALSE      FALSE
+## MRTDist             FALSE      FALSE
+## StoreNum            FALSE      FALSE
+## Latitude            FALSE      FALSE
+## Longitude           FALSE      FALSE
+## 1 subsets of each size up to 6
+## Selection Algorithm: forward
+##          TransactionDate HouseAge MRTDist StoreNum Latitude Longitude
+## 1  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot; &quot;      &quot; &quot;      &quot; &quot;      
+## 2  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot; &quot;      &quot;*&quot;      &quot; &quot;      
+## 3  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot; &quot;      &quot;*&quot;      &quot; &quot;      
+## 4  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 5  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 6  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot;*&quot;</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 3))
+# Cp = 5 variables best
+plot(reg.summary.fwd$cp,
+     xlab = &quot;No. of variables&quot;,
+     ylab = &quot;Cp&quot;,
+     type = &quot;l&quot;)
+points(
+  which.min(reg.summary.fwd$cp),
+  reg.summary.fwd$cp[which.min(reg.summary.fwd$cp)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)
+# BIC = 5 vars best
+plot(reg.summary.fwd$bic,
+     xlab = &quot;No. of variables&quot;,
+     ylab = &quot;BIC&quot;,
+     type = &quot;l&quot;)
+points(
+  which.min(reg.summary.fwd$bic),
+  reg.summary.fwd$bic[which.min(reg.summary.fwd$bic)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)
+# Adj R2 = 5 vars best
+plot(
+  reg.summary.fwd$adjr2,
+  xlab = &quot;No. of variables&quot;,
+  ylab = &quot;Adj. R2&quot;,
+  type = &quot;l&quot;
+)
+points(
+  which.max(reg.summary.fwd$adjr2),
+  reg.summary.fwd$adjr2[which.max(reg.summary.fwd$adjr2)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-15-1.png" width="672" /></p>
+<pre class="r"><code>coef(reg.fwd, 5) # Best subset is with 5 variables #</code></pre>
+<pre><code>##     (Intercept) TransactionDate        HouseAge         MRTDist        StoreNum 
+##   -4.810637e+02    1.313939e-01   -7.631250e-03   -1.398671e-04    2.843698e-02 
+##        Latitude 
+##    8.822385e+00</code></pre>
+</div>
+<div id="backward-stepwise-selection" class="section level1">
+<h1>Backward stepwise selection</h1>
+<pre class="r"><code>reg.bwd &lt;-
+  regsubsets(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    nvmax = 6,
+    method = &quot;backward&quot;
+  )
+reg.summary.bwd &lt;- summary(reg.bwd)
+reg.summary.bwd</code></pre>
+<pre><code>## Subset selection object
+## Call: regsubsets.formula(LnHousePrice ~ TransactionDate + HouseAge + 
+##     MRTDist + StoreNum + Latitude + Longitude, data = REV.train, 
+##     nvmax = 6, method = &quot;backward&quot;)
+## 6 Variables  (and intercept)
+##                 Forced in Forced out
+## TransactionDate     FALSE      FALSE
+## HouseAge            FALSE      FALSE
+## MRTDist             FALSE      FALSE
+## StoreNum            FALSE      FALSE
+## Latitude            FALSE      FALSE
+## Longitude           FALSE      FALSE
+## 1 subsets of each size up to 6
+## Selection Algorithm: backward
+##          TransactionDate HouseAge MRTDist StoreNum Latitude Longitude
+## 1  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot; &quot;      &quot; &quot;      &quot; &quot;      
+## 2  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot; &quot;      &quot;*&quot;      &quot; &quot;      
+## 3  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot; &quot;      &quot;*&quot;      &quot; &quot;      
+## 4  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 5  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 6  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot;*&quot;</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 3))
+# Cp = 5 variables best
+plot(reg.summary.bwd$cp,
+     xlab = &quot;No. of variables&quot;,
+     ylab = &quot;Cp&quot;,
+     type = &quot;l&quot;)
+points(
+  which.min(reg.summary.bwd$cp),
+  reg.summary.bwd$cp[which.min(reg.summary.bwd$cp)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)
+# BIC = 5 vars best
+plot(reg.summary.bwd$bic,
+     xlab = &quot;No. of variables&quot;,
+     ylab = &quot;BIC&quot;,
+     type = &quot;l&quot;)
+points(
+  which.min(reg.summary.bwd$bic),
+  reg.summary.bwd$bic[which.min(reg.summary.bwd$bic)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)
+# Adj R2 = 5 vars best
+plot(
+  reg.summary.bwd$adjr2,
+  xlab = &quot;No. of variables&quot;,
+  ylab = &quot;Adj. R2&quot;,
+  type = &quot;l&quot;
+)
+points(
+  which.max(reg.summary.bwd$adjr2),
+  reg.summary.bwd$adjr2[which.max(reg.summary.bwd$adjr2)],
+  col = &quot;red&quot;,
+  cex = 2,
+  pch = 20
+)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-16-1.png" width="672" /></p>
+<pre class="r"><code>coef(reg.bwd, 5) # Best subset is with 5 variables #</code></pre>
+<pre><code>##     (Intercept) TransactionDate        HouseAge         MRTDist        StoreNum 
+##   -4.810637e+02    1.313939e-01   -7.631250e-03   -1.398671e-04    2.843698e-02 
+##        Latitude 
+##    8.822385e+00</code></pre>
+<pre class="r"><code># All subset methods highlight a 5 variable model is best. They also agree that longitude is the variable of least importance and should be dropped #
+lm.REV.bestsubset.train &lt;-
+  lm(LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude,
+     data = REV.train)
+summary(lm.REV.bestsubset.train) # R-squared = 0.6795, RSE = 0.2305</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = LnHousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude, data = REV.train)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -1.6725 -0.1065  0.0060  0.1069  1.0441 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -4.811e+02  1.006e+02  -4.784 2.78e-06 ***
+## TransactionDate  1.314e-01  4.884e-02   2.691  0.00756 ** 
+## HouseAge        -7.631e-03  1.206e-03  -6.329 9.64e-10 ***
+## MRTDist         -1.399e-04  1.524e-05  -9.177  &lt; 2e-16 ***
+## StoreNum         2.844e-02  5.972e-03   4.761 3.07e-06 ***
+## Latitude         8.822e+00  1.381e+00   6.387 6.94e-10 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 0.2305 on 283 degrees of freedom
+## Multiple R-squared:  0.6795, Adjusted R-squared:  0.6739 
+## F-statistic:   120 on 5 and 283 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>lm.REV.bestsubset.test &lt;- predict(lm.REV.bestsubset.train, REV.test)
+mean((REV.test$HousePrice - (exp(
+  lm.REV.bestsubset.test
+))) ^ 2) #MSE = 61.45236</code></pre>
+<pre><code>## [1] 61.45236</code></pre>
+<pre class="r"><code>ln.bestsubset.r2 &lt;-
+  1 - sum((REV.test$LnHousePrice - lm.REV.bestsubset.test) ^ 2) / sum((REV.test$LnHousePrice - mean(REV.test$LnHousePrice)) ^
+                                                                        2)
+ln.bestsubset.r2 # R-squared = 0.6992486</code></pre>
+<pre><code>## [1] 0.6992486</code></pre>
+<div id="ridge-and-lasso" class="section level2">
+<h2>Ridge and Lasso</h2>
+</div>
+</div>
+<div id="ridge" class="section level1">
+<h1>Ridge</h1>
+<pre class="r"><code>set.seed(10)
+
+train.X &lt;-
+  model.matrix(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train
+  )[, -1]
+test.X &lt;-
+  model.matrix(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.test
+  )[, -1]
+grid &lt;-
+  10 ^ seq(5,-3, length = 414) # computes the CV error for the 100 values for the ridge regression # IS THIS NECESSARY
+
+ridge.mod &lt;-
+  glmnet(train.X,
+         REV.train$LnHousePrice,
+         alpha = 0,
+         lambda = grid) # alpha = 0 tells R that we want to do ridge
+ridge.cv &lt;-
+  cv.glmnet(train.X,
+            REV.train$LnHousePrice,
+            alpha = 0,
+            lamda = grid)
+
+par(mfrow = c(1, 1))
+plot(ridge.cv) # MSE minimised when lambda is very small, so the original least squared regression good at minimising MSE for this model</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-18-1.png" width="672" /></p>
+<pre class="r"><code># first dotted line gives minimum MSE and the second gives the smallest MSE within 1 se of the minimum
+
+ridge.bestlam &lt;- ridge.cv$lambda.min
+ridge.bestlam # 0.02984678</code></pre>
+<pre><code>## [1] 0.02984678</code></pre>
+<pre class="r"><code>predict(ridge.mod,
+        type = &quot;coefficients&quot;,
+        s = ridge.bestlam,
+        newx = test.X)</code></pre>
+<pre><code>## 7 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
+##                             1
+## (Intercept)     -6.820721e+02
+## TransactionDate  1.203953e-01
+## HouseAge        -7.092077e-03
+## MRTDist         -1.121054e-04
+## StoreNum         2.920636e-02
+## Latitude         8.785038e+00
+## Longitude        1.843442e+00</code></pre>
+<pre class="r"><code>summary(lm.REV) # Coefficient Comparison</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude + Longitude, data = RealEstateValuation_Data_)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -35.667  -5.412  -0.967   4.217  75.190 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -1.444e+04  6.775e+03  -2.132  0.03364 *  
+## TransactionDate  5.149e+00  1.557e+00   3.307  0.00103 ** 
+## HouseAge        -2.697e-01  3.853e-02  -7.000 1.06e-11 ***
+## MRTDist         -4.488e-03  7.180e-04  -6.250 1.04e-09 ***
+## StoreNum         1.133e+00  1.882e-01   6.023 3.83e-09 ***
+## Latitude         2.255e+02  4.457e+01   5.059 6.38e-07 ***
+## Longitude       -1.243e+01  4.858e+01  -0.256  0.79820    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 8.858 on 407 degrees of freedom
+## Multiple R-squared:  0.5824, Adjusted R-squared:  0.5762 
+## F-statistic:  94.6 on 6 and 407 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>ridge.pred1 &lt;- predict(ridge.mod, s = ridge.bestlam, newx = test.X)
+mean((REV.test$HousePrice - exp(ridge.pred1)) ^ 2) # MSE = 62.69749</code></pre>
+<pre><code>## [1] 62.69749</code></pre>
+<pre class="r"><code># within 1 se
+ridge.1se &lt;- ridge.cv$lambda.1se
+ridge.1se # 0.3679651</code></pre>
+<pre><code>## [1] 0.3679651</code></pre>
+<pre class="r"><code>ridge.pred2 &lt;- predict(ridge.mod, s = ridge.1se, newx = test.X)
+mean((exp(ridge.pred2) - REV.test$HousePrice) ^ 2)  # 71.8387, MSE goes up quite a bit</code></pre>
+<pre><code>## [1] 71.8387</code></pre>
+<pre class="r"><code>rss.ridge &lt;- mean((ridge.pred1 - REV.test$LnHousePrice) ^ 2)</code></pre>
+</div>
+<div id="lasso-regression" class="section level1">
+<h1>Lasso regression</h1>
+<pre class="r"><code>lasso.mod &lt;-
+  glmnet(train.X,
+         REV.train$LnHousePrice,
+         alpha = 1,
+         lambda = grid) # alpha = 1 for lasso
+lasso.cv &lt;-
+  cv.glmnet(train.X,
+            REV.train$LnHousePrice,
+            alpha = 1,
+            lambda = grid)
+plot(lasso.cv) # if high enough values of lambda chosen, number of predictor variables drop to 0,</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-19-1.png" width="672" /></p>
+<pre class="r"><code>lasso.bestlam &lt;- lasso.cv$lambda.min
+lasso.bestlam # 0.002440109</code></pre>
+<pre><code>## [1] 0.002440109</code></pre>
+<pre class="r"><code>lasso.pred1 &lt;- predict(lasso.mod, s = lasso.bestlam, newx = test.X)
+mean((exp(lasso.pred1) - REV.test$HousePrice) ^ 2) # MSE = 61.44527</code></pre>
+<pre><code>## [1] 61.43279</code></pre>
+<pre class="r"><code>predict(lasso.mod, type = &quot;coefficients&quot;, s = lasso.bestlam) # All coefficients used</code></pre>
+<pre><code>## 7 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
+##                             1
+## (Intercept)     -4.849918e+02
+## TransactionDate  1.225458e-01
+## HouseAge        -7.404231e-03
+## MRTDist         -1.371275e-04
+## StoreNum         2.798246e-02
+## Latitude         8.743845e+00
+## Longitude        1.949798e-01</code></pre>
+<pre class="r"><code># Most sparse lasso model with 1 se
+lasso.1se &lt;- lasso.cv$lambda.1se
+lasso.1se # 2.805058</code></pre>
+<pre><code>## [1] 0.0661947</code></pre>
+<pre class="r"><code>lasso.pred2 &lt;- predict(lasso.mod, s = lasso.1se, newx = test.X)
+mean((exp(lasso.pred2) - REV.test$HousePrice) ^ 2) # 71.62681, MSE goes up quite a bit, is ridge better?</code></pre>
+<pre><code>## [1] 72.4778</code></pre>
+<pre class="r"><code>predict(lasso.mod, type = &quot;coefficients&quot;, s = lasso.1se) # only 2 zero coefficients on variables.</code></pre>
+<pre><code>## 7 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
+##                             1
+## (Intercept)     -1.427030e+02
+## TransactionDate  .           
+## HouseAge        -1.622531e-03
+## MRTDist         -1.263240e-04
+## StoreNum         1.433893e-02
+## Latitude         5.862406e+00
+## Longitude        .</code></pre>
+<pre class="r"><code>ln.test.avg &lt;- mean(RealEstateValuation_Data_$LnHousePrice)
+rss.lasso &lt;-
+  mean((lasso.pred1 - REV.test$HousePrice) ^ 2) # 1st as MSE is lower and only uses one more variable
+lasso.test.r2 = 1 - mean((REV.test$LnHousePrice - lasso.pred1) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                             2)
+lasso.test.r2</code></pre>
+<pre><code>## [1] 0.7001443</code></pre>
+<div id="pcr-and-pls" class="section level3">
+<h3>PCR and PLS</h3>
+</div>
+</div>
+<div id="pcr" class="section level1">
+<h1>PCR</h1>
+<pre class="r"><code>set.seed(10)
+pcr.mod &lt;-
+  pcr(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    scale = TRUE,
+    validation = &quot;CV&quot;
+  )
+summary(pcr.mod) #</code></pre>
+<pre><code>## Data:    X dimension: 289 6 
+##  Y dimension: 289 1
+## Fit method: svdpc
+## Number of components considered: 6
+## 
+## VALIDATION: RMSEP
+## Cross-validated using 10 random segments.
+##        (Intercept)  1 comps  2 comps  3 comps  4 comps  5 comps  6 comps
+## CV          0.4043   0.2536   0.2538   0.2382   0.2361   0.2350   0.2327
+## adjCV       0.4043   0.2534   0.2536   0.2380   0.2352   0.2348   0.2324
+## 
+## TRAINING: % variance explained
+##               1 comps  2 comps  3 comps  4 comps  5 comps  6 comps
+## X               45.52    62.86    79.38    88.94    97.89   100.00
+## LnHousePrice    61.10    61.28    65.74    67.13    67.13    67.96</code></pre>
+<pre class="r"><code>validationplot(pcr.mod, val.type = &quot;MSEP&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-20-1.png" width="672" /></p>
+<pre class="r"><code>pcr.pred &lt;-
+  predict(pcr.mod, REV.test, ncomp = 4) # REV.test - should it be 6 components?
+mean((exp(pcr.pred) - REV.test$HousePrice) ^ 2)  # MSE = 67.50837, same as ridge</code></pre>
+<pre><code>## [1] 67.50837</code></pre>
+<pre class="r"><code>ln.test.avg &lt;- mean(RealEstateValuation_Data_$LnHousePrice)
+pcr.test.r2 &lt;-
+  1 - mean((REV.test$LnHousePrice - pcr.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                            2)
+pcr.test.r2</code></pre>
+<pre><code>## [1] 0.676837</code></pre>
+</div>
+<div id="pls" class="section level1">
+<h1>PLS</h1>
+<pre class="r"><code>pls.mod &lt;-
+  plsr(
+    LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    scale = TRUE,
+    validation = &quot;CV&quot;
+  )
+summary(pls.mod)</code></pre>
+<pre><code>## Data:    X dimension: 289 6 
+##  Y dimension: 289 1
+## Fit method: kernelpls
+## Number of components considered: 6
+## 
+## VALIDATION: RMSEP
+## Cross-validated using 10 random segments.
+##        (Intercept)  1 comps  2 comps  3 comps  4 comps  5 comps  6 comps
+## CV          0.4043   0.2434   0.2364   0.2358   0.2350   0.2347   0.2346
+## adjCV       0.4043   0.2433   0.2361   0.2354   0.2346   0.2343   0.2343
+## 
+## TRAINING: % variance explained
+##               1 comps  2 comps  3 comps  4 comps  5 comps  6 comps
+## X               45.19    61.06    70.45    74.17    91.04   100.00
+## LnHousePrice    64.49    67.27    67.66    67.95    67.96    67.96</code></pre>
+<pre class="r"><code>validationplot(pls.mod, val.type = &quot;MSEP&quot;) # shows ideal M is 13 components</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-21-1.png" width="672" /></p>
+<pre class="r"><code>pls.pred &lt;- predict(pls.mod, REV.test, ncomp = 4) # REV.test
+mean((exp(pls.pred) - REV.test$HousePrice) ^ 2)  # MSE = 61.75218</code></pre>
+<pre><code>## [1] 61.75218</code></pre>
+<pre class="r"><code>ln.test.avg = mean(REV.test$LnHousePrice)
+pcr.test.r2 = 1 - mean((REV.test$LnHousePrice - pcr.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+pcr.test.r2</code></pre>
+<pre><code>## [1] 0.6768346</code></pre>
+<div id="gam" class="section level3">
+<h3>GAM</h3>
+<pre class="r"><code># FIND TOP 3 REGRESSORS AND THEN WORK OUT OPTIMAL SPLITS/NO. LOCAL REGRESSIONS, check best variables using subset results #
+reg.full &lt;-
+  regsubsets(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = RealEstateValuation_Data_,
+    nvmax = 6
+  )
+reg.summary &lt;- summary(reg.full)
+reg.summary # Top 3 regressors, MRTDist, StoreNum, HouseAge</code></pre>
+<pre><code>## Subset selection object
+## Call: regsubsets.formula(HousePrice ~ TransactionDate + HouseAge + 
+##     MRTDist + StoreNum + Latitude + Longitude, data = RealEstateValuation_Data_, 
+##     nvmax = 6)
+## 6 Variables  (and intercept)
+##                 Forced in Forced out
+## TransactionDate     FALSE      FALSE
+## HouseAge            FALSE      FALSE
+## MRTDist             FALSE      FALSE
+## StoreNum            FALSE      FALSE
+## Latitude            FALSE      FALSE
+## Longitude           FALSE      FALSE
+## 1 subsets of each size up to 6
+## Selection Algorithm: exhaustive
+##          TransactionDate HouseAge MRTDist StoreNum Latitude Longitude
+## 1  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot; &quot;      &quot; &quot;      &quot; &quot;      
+## 2  ( 1 ) &quot; &quot;             &quot; &quot;      &quot;*&quot;     &quot;*&quot;      &quot; &quot;      &quot; &quot;      
+## 3  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot; &quot;      &quot; &quot;      
+## 4  ( 1 ) &quot; &quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 5  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot; &quot;      
+## 6  ( 1 ) &quot;*&quot;             &quot;*&quot;      &quot;*&quot;     &quot;*&quot;      &quot;*&quot;      &quot;*&quot;</code></pre>
+<pre class="r"><code>set.seed(10)</code></pre>
+<pre class="r"><code># Range of DoF, plotted fits and RSS
+sp.rss &lt;- rep(0, 18)
+for (i in 3:20) {
+  sp.fit1 &lt;-
+    lm(HousePrice ~ bs(MRTDist, df = i) + bs(StoreNum, df = i) +
+                    bs(HouseAge, df = i), data = REV.train)
+  sp.rss[i - 2] &lt;- sum(sp.fit1$residuals ^ 2) # storing RSS
+}
+sp.rss</code></pre>
+<pre><code>##  [1] 21098.41 20711.70 20469.62 20329.66 19674.79 18825.02 18902.29 17964.62
+##  [9] 17844.61 17448.22 17186.96 17181.82 17114.64 16880.74 16583.86 16674.40
+## [17] 16438.63 16113.72</code></pre>
+<pre class="r"><code>plot(3:20,
+     sp.rss,
+     ylab = &quot;RSS&quot;,
+     xlab = &quot;Degrees of Freedom&quot;,
+     type = &quot;l&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-23-1.png" width="672" /></p>
+<pre class="r"><code>min(sp.rss) # 16113.72</code></pre>
+<pre><code>## [1] 16113.72</code></pre>
+<pre class="r"><code># CV to select the best DoF
+cv.err &lt;- rep(0, 18)
+for (i in 3:20) {
+  cv.fit &lt;-
+    glm(HousePrice ~ bs(MRTDist, df = i) + bs(StoreNum, df = i) + bs(HouseAge, df =
+                                                                       i),
+        data = REV.train)
+  cv.err[i - 2] &lt;-
+    cv.glm(REV.train, cv.fit, K = 10)$delta[1] # i-2 because the for loop starts at df = 3 so has to discount to fit the actual data which starts at 1.
+}</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = numeric(0), Boundary.knots = c(0, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases
+
+## Warning in bs(HouseAge, degree = 3L, knots = numeric(0), Boundary.knots = c(0, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = numeric(0), Boundary.knots =
+## c(23.38284, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases
+
+## Warning in bs(MRTDist, degree = 3L, knots = numeric(0), Boundary.knots =
+## c(23.38284, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`50%` = 502.39), Boundary.knots
+## = c(23.38284, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`50%` = 16.15), Boundary.knots =
+## c(0, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`50%` = 502.39), Boundary.knots
+## = c(23.38284, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`50%` = 16.15), Boundary.knots =
+## c(0, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`33.33333%` = 383.8624,
+## `66.66667%` = 1004.7418: some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases
+
+## Warning in bs(MRTDist, degree = 3L, knots = c(`33.33333%` = 383.8624,
+## `66.66667%` = 1004.7418: some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`33.33333%` = 12.3666666666667, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases
+
+## Warning in bs(HouseAge, degree = 3L, knots = c(`33.33333%` = 12.3666666666667, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`25%` = 9.1, `50%` = 16.2, : some
+## &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases
+
+## Warning in bs(HouseAge, degree = 3L, knots = c(`25%` = 9.1, `50%` = 16.2, : some
+## &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`25%` = 292.9978, `50%` =
+## 492.2313, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases
+
+## Warning in bs(MRTDist, degree = 3L, knots = c(`25%` = 292.9978, `50%` =
+## 492.2313, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`20%` = 263.98086, `40%` =
+## 393.71462, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases
+
+## Warning in bs(MRTDist, degree = 3L, knots = c(`20%` = 263.98086, `40%` =
+## 393.71462, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`20%` = 7.9, `40%` = 13.6, : some
+## &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases
+
+## Warning in bs(HouseAge, degree = 3L, knots = c(`20%` = 7.9, `40%` = 13.6, : some
+## &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`16.66667%` = 5.5, `33.33333%` =
+## 12.8, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases
+
+## Warning in bs(HouseAge, degree = 3L, knots = c(`16.66667%` = 5.5, `33.33333%` =
+## 12.8, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`16.66667%` = 209.797566666667, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases
+
+## Warning in bs(MRTDist, degree = 3L, knots = c(`16.66667%` = 209.797566666667, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`14.28571%` = 5, `28.57143%` =
+## 11.5, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`14.28571%` = 5, `28.57143%` =
+## 11.5, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`14.28571%` = 201.8939,
+## `28.57143%` = 339.2289, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`14.28571%` = 201.8939,
+## `28.57143%` = 339.2289, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`14.28571%` = 193.5845,
+## `28.57143%` = 339.2289, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`14.28571%` = 193.5845,
+## `28.57143%` = 339.2289, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`12.5%` = 3.8375, `25%` =
+## 9.075, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`12.5%` = 3.8375, `25%` =
+## 9.075, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`12.5%` = 187.9246625, `25%` =
+## 292.07955, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`12.5%` = 187.9246625, `25%` =
+## 292.07955, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`11.11111%` = 3.87777777777778, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`11.11111%` = 3.87777777777778, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`11.11111%` = 185.4296,
+## `22.22222%` = 289.3248, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`11.11111%` = 185.4296,
+## `22.22222%` = 289.3248, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`10%` = 3.1, `20%` = 7.1, : some
+## &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`10%` = 3.1, `20%` = 7.1, : some
+## &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`10%` = 179.07136, `20%` =
+## 279.1726, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`10%` = 179.07136, `20%` =
+## 279.1726, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`9.090909%` = 175.488936363636, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`9.090909%` = 175.488936363636, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`9.090909%` = 2.6, `18.18182%`
+## = 6.30909090909091, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`9.090909%` = 2.6, `18.18182%`
+## = 6.30909090909091, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`8.333333%` = 2.6, `16.66667%` =
+## 5.95, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`8.333333%` = 2.6, `16.66667%` =
+## 5.95, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`8.333333%` = 155.3817,
+## `16.66667%` = 204.569333333333, : some &#39;x&#39; values beyond boundary knots may
+## cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`8.333333%` = 155.3817,
+## `16.66667%` = 204.569333333333, : some &#39;x&#39; values beyond boundary knots may
+## cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`7.692308%` = 2.57692307692308, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`7.692308%` = 2.57692307692308, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`7.692308%` = 166.830153846154, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`7.692308%` = 166.830153846154, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`7.142857%` = 2.45, `14.28571%` =
+## 5, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`7.142857%` = 2.45, `14.28571%` =
+## 5, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`7.142857%` = 162.60205,
+## `14.28571%` = 193.5845, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`7.142857%` = 162.60205,
+## `14.28571%` = 193.5845, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`6.666667%` = 109.858846666667, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`6.666667%` = 109.858846666667, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`6.666667%` = 1.58, `13.33333%` =
+## 4, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`6.666667%` = 1.58, `13.33333%` =
+## 4, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`6.25%` = 123.97695625, `12.5%` =
+## 186.6820375, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`6.25%` = 123.97695625, `12.5%` =
+## 186.6820375, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned
+## bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`6.25%` = 1.5, `12.5%` =
+## 3.8375, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`6.25%` = 1.5, `12.5%` =
+## 3.8375, : some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`5.882353%` = 2.02352941176471, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`5.882353%` = 2.02352941176471, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`5.882353%` = 124.036617647059, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`5.882353%` = 124.036617647059, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`5.555556%` = 1.25555555555556, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(HouseAge, degree = 3L, knots = c(`5.555556%` = 1.25555555555556, :
+## some &#39;x&#39; values beyond boundary knots may cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`5.555556%` = 104.8101,
+## `11.11111%` = 183.607177777778, : some &#39;x&#39; values beyond boundary knots may
+## cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`5.555556%` = 104.8101,
+## `11.11111%` = 183.607177777778, : some &#39;x&#39; values beyond boundary knots may
+## cause ill-conditioned bases</code></pre>
+<pre><code>## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading
+
+## Warning in predict.lm(object, newdata, se.fit, scale = 1, type = if (type == :
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre class="r"><code>cv.err</code></pre>
+<pre><code>##  [1]  78.49204  80.66944  78.98475  79.77126  82.67007  82.36099  87.81094
+##  [8]  81.16298  78.25009  82.05895  84.86136  83.66825  83.96373  91.88695
+## [15]  93.38673  96.10243 134.00385 109.94086</code></pre>
+<pre class="r"><code>plot(3:20,
+     cv.err,
+     ylab = &quot;Test MSE&quot;,
+     xlab = &quot;Degrees of Freedom&quot;,
+     type = &quot;l&quot;)  # would choose df = 6 model, says 4 but have to add 2 on</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-24-1.png" width="672" /></p>
+<pre class="r"><code>min(cv.err) # DOF = 11 gives lowest cv error of 78.25009</code></pre>
+<pre><code>## [1] 78.25009</code></pre>
+<pre class="r"><code>gam.fit &lt;-
+  gam(
+    HousePrice ~ bs(MRTDist, df = 11) + bs(StoreNum, df = 11) + bs(HouseAge, df = 11) + TransactionDate + Latitude,
+    data = REV.train
+  ) # REV.train
+par(mfrow = c(2, 3))
+plot(gam.fit, se = T, col = &quot;green&quot;)
+summary(gam.fit) # look at Anova for Nonparametric Effects, only one variable is non-linear, can only reject one variables null hypothesis when tested for nonparametric effects, shows we need to focus our effect on Expend and add more knots to it</code></pre>
+<pre><code>## 
+## Call: gam(formula = HousePrice ~ bs(MRTDist, df = 11) + bs(StoreNum, 
+##     df = 11) + bs(HouseAge, df = 11) + TransactionDate + Latitude, 
+##     data = REV.train)
+## Deviance Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -27.3611  -3.6158  -0.4453   2.9669  60.9494 
+## 
+## (Dispersion Parameter for gaussian family taken to be 61.1485)
+## 
+##     Null Deviance: 56453.21 on 288 degrees of freedom
+## Residual Deviance: 15531.72 on 254 degrees of freedom
+## AIC: 2043.584 
+## 
+## Number of Local Scoring Iterations: 2 
+## 
+## Anova for Parametric Effects
+##                        Df Sum Sq Mean Sq F value    Pr(&gt;F)    
+## bs(MRTDist, df = 11)   11  33922 3083.84 50.4320 &lt; 2.2e-16 ***
+## bs(StoreNum, df = 11)  10   1191  119.05  1.9470 0.0396075 *  
+## bs(HouseAge, df = 11)  11   3496  317.80  5.1972 2.253e-07 ***
+## TransactionDate         1    746  745.81 12.1967 0.0005645 ***
+## Latitude                1   1567 1567.08 25.6274 7.959e-07 ***
+## Residuals             254  15532   61.15                      
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code># MRTDist and HouseAge very non linear
+
+gam.pred &lt;- predict(gam.fit, REV.test) # REV.test</code></pre>
+<pre><code>## Warning in bs(MRTDist, degree = 3L, knots = c(`11.11111%` = 185.4296,
+## `22.22222%` = 289.3248, : some &#39;x&#39; values beyond boundary knots may cause ill-
+## conditioned bases
+
+## Warning in bs(MRTDist, degree = 3L, knots = c(`11.11111%` = 185.4296,
+## `22.22222%` = 289.3248, : prediction from a rank-deficient fit may be misleading</code></pre>
+<pre class="r"><code>mean((REV.test$HousePrice - gam.pred) ^ 2) # 53.11884 MSE</code></pre>
+<pre><code>## [1] 53.11884</code></pre>
+<pre class="r"><code># R2 = MSS/TSS = (TSS-RSS)/TSS = 1 - RSS/TSS
+gam.test1.r2 &lt;-
+  1 - sum((REV.test$HousePrice - gam.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                        2)
+gam.test1.r2 # = 0.6677571</code></pre>
+<pre><code>## [1] 0.6677571</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-24-2.png" width="672" /></p>
+</div>
+<div id="regression-tree" class="section level3">
+<h3>Regression Tree</h3>
+<pre class="r"><code>dim(RealEstateValuation_Data_)</code></pre>
+<pre><code>## [1] 414   9</code></pre>
+<pre class="r"><code>set.seed(10)
+par(mfrow = c(1, 1))
+regtree.REV  &lt;-
+  tree(HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+       data = REV.train) # work out what&#39;s going on then add back in + Latitude + Longitude
+summary(regtree.REV)</code></pre>
+<pre><code>## 
+## Regression tree:
+## tree(formula = HousePrice ~ TransactionDate + HouseAge + MRTDist + 
+##     StoreNum + Latitude + Longitude, data = REV.train)
+## Variables actually used in tree construction:
+## [1] &quot;MRTDist&quot;         &quot;HouseAge&quot;        &quot;Latitude&quot;        &quot;TransactionDate&quot;
+## [5] &quot;StoreNum&quot;       
+## Number of terminal nodes:  11 
+## Residual mean deviance:  48.86 = 13580 / 278 
+## Distribution of residuals:
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+## -30.4700  -3.8170   0.1625   0.0000   3.3630  43.7200</code></pre>
+<pre class="r"><code>plot(regtree.REV)
+text(regtree.REV, pretty = 0, col = &quot;Red&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-25-1.png" width="672" /></p>
+<pre class="r"><code>regtree.pred &lt;- predict(regtree.REV, newdata = REV.test)
+mean((regtree.pred - REV.test$HousePrice) ^ 2) # MSE = 58.07941</code></pre>
+<pre><code>## [1] 58.07941</code></pre>
+<pre class="r"><code>regtree.test1.r2 &lt;-
+  1 - sum((REV.test$HousePrice - regtree.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                            2)
+regtree.test1.r2# = 0.6367302</code></pre>
+<pre><code>## [1] 0.6367302</code></pre>
+<pre class="r"><code># CV to determine optimum complexity #
+set.seed(10)
+cv.REV &lt;- cv.tree(regtree.REV)
+cv.REV</code></pre>
+<pre><code>## $size
+##  [1] 11 10  9  8  7  6  5  4  3  2  1
+## 
+## $dev
+##  [1] 23026.54 21215.04 21452.55 21452.55 22177.42 22730.31 23682.26 23917.92
+##  [9] 25707.99 30184.25 57234.89
+## 
+## $k
+##  [1]       -Inf   669.0389   742.0005   778.9869   892.8029   963.9144
+##  [7]  1324.1022  1486.6283  2270.1387  6006.1849 27735.2941
+## 
+## $method
+## [1] &quot;deviance&quot;
+## 
+## attr(,&quot;class&quot;)
+## [1] &quot;prune&quot;         &quot;tree.sequence&quot;</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 1))
+plot(cv.REV$size, cv.REV$dev, type = &quot;b&quot;) #  min occurs at size 10, $dev = RSS</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-25-2.png" width="672" /></p>
+<pre class="r"><code># tree-pruning #
+prune.REV &lt;-
+  prune.tree(regtree.REV, best = 10) # command for weakest link pruning, best = what size tree we want
+plot(prune.REV)
+text(prune.REV, pretty = 0, col = &quot;Dark Blue&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-25-3.png" width="672" /></p>
+<pre class="r"><code>regtree.prune.pred &lt;- predict(prune.REV, newdata = REV.test)
+mean((REV.test$HousePrice - regtree.prune.pred) ^ 2) # Marginal Improvement in MSE, 56.34469</code></pre>
+<pre><code>## [1] 56.34469</code></pre>
+<pre class="r"><code>regtree.prune.r2 &lt;-
+  1 - sum((REV.test$HousePrice - regtree.prune.pred) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                             2)
+regtree.prune.r2 # = 0.6475803</code></pre>
+<pre><code>## [1] 0.6475803</code></pre>
+</div>
+<div id="bagging-random-forests-and-boosting" class="section level3">
+<h3>Bagging, Random Forests and Boosting</h3>
+</div>
+</div>
+<div id="bagging" class="section level1">
+<h1>Bagging</h1>
+<pre class="r"><code>set.seed(10)
+bagging.REV &lt;-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 6,
+    importance = TRUE
+  ) # mtry = how many variables you want to try on each node, equal to 10 because 10 predictor variables in the data
+bagging.REV  # % var explained sort of like r-sqaured from linear regression</code></pre>
+<pre><code>## 
+## Call:
+##  randomForest(formula = HousePrice ~ TransactionDate + HouseAge +      MRTDist + StoreNum + Latitude + Longitude, data = REV.train,      mtry = 6, importance = TRUE) 
+##                Type of random forest: regression
+##                      Number of trees: 500
+## No. of variables tried at each split: 6
+## 
+##           Mean of squared residuals: 65.37267
+##                     % Var explained: 66.53</code></pre>
+<pre class="r"><code>pred.bagging &lt;- predict(bagging.REV, newdata = REV.test)
+mean((REV.test$HousePrice - pred.bagging) ^ 2) # test MSE = 47.46447</code></pre>
+<pre><code>## [1] 47.46447</code></pre>
+<pre class="r"><code>bagging.test1.r2 &lt;-
+  1 - sum((REV.test$HousePrice - pred.bagging) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^                                                            2)
+bagging.test1.r2 # = 0.7031235</code></pre>
+<pre><code>## [1] 0.7031235</code></pre>
+<pre class="r"><code>importance(bagging.REV) # %IncMSE percentage amount MSE will increase on average if you remove the variable</code></pre>
+<pre><code>##                   %IncMSE IncNodePurity
+## TransactionDate  5.068434     1513.2704
+## HouseAge        24.307029     9673.9463
+## MRTDist         35.788633    31073.6714
+## StoreNum         3.226787      957.8638
+## Latitude        30.233011     5820.8623
+## Longitude       21.316598     5779.8930</code></pre>
+<pre class="r"><code>varImpPlot(bagging.REV)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-26-1.png" width="672" /></p>
+</div>
+<div id="random-forests" class="section level1">
+<h1>Random Forests</h1>
+<pre class="r"><code>set.seed(10)
+rf0.REV &lt;-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 5,
+    importance = TRUE
+  )
+pred.rf0 &lt;- predict(rf0.REV, newdata = REV.test)
+mean((pred.rf0  - REV.test$HousePrice) ^ 2) # test MSE = 46.75659</code></pre>
+<pre><code>## [1] 45.00267</code></pre>
+<pre class="r"><code>rf1.REV &lt;-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 4,
+    importance = TRUE
+  )
+pred.rf1 &lt;- predict(rf1.REV, newdata = REV.test)
+mean((pred.rf1  - REV.test$HousePrice) ^ 2) # test MSE = 44.79176</code></pre>
+<pre><code>## [1] 42.5712</code></pre>
+<pre class="r"><code>rf2.REV &lt;-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 3,
+    importance = TRUE
+  )
+pred.rf2 &lt;- predict(rf2.REV, newdata = REV.test)
+mean((pred.rf2  - REV.test$HousePrice) ^ 2) # test MSE = 41.35314</code></pre>
+<pre><code>## [1] 40.57722</code></pre>
+<pre class="r"><code>rf3.REV &lt;-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 2,
+    importance = TRUE
+  )
+pred.rf3 &lt;- predict(rf3.REV, newdata = REV.test)
+mean((pred.rf3  - REV.test$HousePrice) ^ 2) # test MSE = 40.31746 # Use this one #</code></pre>
+<pre><code>## [1] 41.00969</code></pre>
+<pre class="r"><code>summary(rf3.REV)</code></pre>
+<pre><code>##                 Length Class  Mode     
+## call              5    -none- call     
+## type              1    -none- character
+## predicted       289    -none- numeric  
+## mse             500    -none- numeric  
+## rsq             500    -none- numeric  
+## oob.times       289    -none- numeric  
+## importance       12    -none- numeric  
+## importanceSD      6    -none- numeric  
+## localImportance   0    -none- NULL     
+## proximity         0    -none- NULL     
+## ntree             1    -none- numeric  
+## mtry              1    -none- numeric  
+## forest           11    -none- list     
+## coefs             0    -none- NULL     
+## y               289    -none- numeric  
+## test              0    -none- NULL     
+## inbag             0    -none- NULL     
+## terms             3    terms  call</code></pre>
+<pre class="r"><code>rf4.REV &lt;-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 1,
+    importance = TRUE
+  )
+pred.rf4 &lt;- predict(rf4.REV, newdata = REV.test)
+mean((pred.rf4  - REV.test$HousePrice) ^ 2) # test MSE = 41.30107</code></pre>
+<pre><code>## [1] 41.68195</code></pre>
+<pre class="r"><code>rf3.REV.test &lt;-
+  randomForest(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    mtry = 2,
+    importance = TRUE
+  )
+pred.rf3.test &lt;- predict(rf3.REV, newdata = REV.test)
+mean((pred.rf3.test  - REV.test$HousePrice) ^ 2) # test MSE = 40.31746 # Use this one #</code></pre>
+<pre><code>## [1] 41.00969</code></pre>
+<pre class="r"><code>rf3.test.r2 &lt;-
+  1 - sum((REV.test$HousePrice - pred.rf3) ^ 2) / sum((REV.test$HousePrice - mean(REV.test$HousePrice)) ^
+                                                        2)
+rf3.test.r2 # = 0.7456565</code></pre>
+<pre><code>## [1] 0.7434963</code></pre>
+<pre class="r"><code># test MSE # better performance because the random tree construction is very different and so variance is reduced because they are uncorrelated with each other and on average variance is lower
+# if we have all 10 variables are available the trees will look very similar whereas with fewer variables available in randomForest it can outperform bagging as variance is reduced by having more different trees
+
+rf3.REV</code></pre>
+<pre><code>## 
+## Call:
+##  randomForest(formula = HousePrice ~ TransactionDate + HouseAge +      MRTDist + StoreNum + Latitude + Longitude, data = REV.train,      mtry = 2, importance = TRUE) 
+##                Type of random forest: regression
+##                      Number of trees: 500
+## No. of variables tried at each split: 2
+## 
+##           Mean of squared residuals: 62.88434
+##                     % Var explained: 67.81</code></pre>
+<pre class="r"><code>importance(rf3.REV)</code></pre>
+<pre><code>##                   %IncMSE IncNodePurity
+## TransactionDate  1.395255      1792.482
+## HouseAge        21.728589      7622.133
+## MRTDist         22.979274     17226.623
+## StoreNum        15.116271      5872.734
+## Latitude        24.099782     11483.747
+## Longitude       19.186697      9562.770</code></pre>
+<pre class="r"><code>varImpPlot(rf3.REV)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-27-1.png" width="672" /></p>
+</div>
+<div id="boosting" class="section level1">
+<h1>Boosting</h1>
+<pre class="r"><code>set.seed(10)
+
+lambda &lt;- 10 ^ seq(from = -5, to = -0.5, by = 0.05) # shrinkage parameter
+test.error &lt;- rep(-1, length(lambda))
+
+for (i in 1:length(lambda)) {
+  boosting.REV.train &lt;-
+    gbm(
+      HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+      data = REV.train,
+      distribution = &quot;gaussian&quot;,
+      n.trees = 1000,
+      shrinkage = lambda[i]
+    )
+  pred.boosting &lt;-
+    predict(boosting.REV.train, REV.test, n.trees = 1000)
+  test.error[i] &lt;- mean((pred.boosting - REV.test$HousePrice) ^ 2)
+}
+plot(lambda,
+     test.error,
+     type = &quot;b&quot;,
+     xlab = &quot;Lambda&quot;,
+     ylab = &quot;Test MSE&quot;)</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-28-1.png" width="672" /></p>
+<pre class="r"><code>bestlam.boosting &lt;-
+  lambda[which.min(test.error)] # shrinkage parameter - lambda - corresponding to the minimum
+bestlam.boosting # minimum test MSE (Boosting) 4.721133</code></pre>
+<pre><code>## [1] 0.005623413</code></pre>
+<pre class="r"><code>boosting.REV &lt;-
+  gbm(
+    HousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
+    data = REV.train,
+    distribution = &quot;gaussian&quot;,
+    n.trees = 1000,
+    shrinkage = bestlam.boosting
+  )
+pred.boosting &lt;- predict(boosting.REV, REV.test, n.trees = 1000)
+
+mean((REV.test$HousePrice - pred.boosting) ^ 2)</code></pre>
+<pre><code>## [1] 49.66527</code></pre>
+<pre class="r"><code>test.avg = mean(REV.test$HousePrice)
+boosting.test.r2 = 1 - mean((REV.test$HousePrice - pred.boosting) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                                2)
+boosting.test.r2</code></pre>
+<pre><code>## [1] 0.6893582</code></pre>
+<div id="method-comparison" class="section level3">
+<h3>Method Comparison</h3>
+</div>
+</div>
+<div id="r-squared" class="section level1">
+<h1>R-squared</h1>
+<pre class="r"><code>par(mfrow = c(1, 1))
+test.avg = mean(REV.test$HousePrice)
+ln.test.avg = mean(REV.test$LnHousePrice)
+lm.test.r2 = 1 - mean((REV.test$HousePrice - lm.pred) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                    2)
+ln.test.r2 &lt;-
+  1 - sum((REV.test$HousePrice - converted.back) ^ 2) / sum((REV.test$HousePrice - test.avg) ^
+                                                              2)
+ln.bestsubset.r2 &lt;-
+  1 - sum((REV.test$LnHousePrice - lm.REV.bestsubset.test) ^ 2) / sum((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+ridge.test.r2 = 1 - mean((REV.test$LnHousePrice - ridge.pred1) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                             2)
+lasso.test.r2 = 1 - mean((REV.test$LnHousePrice - lasso.pred1) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                             2)
+pcr.test.r2 = 1 - mean((REV.test$LnHousePrice - pcr.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+pls.test.r2 = 1 - mean((REV.test$LnHousePrice - pls.pred) ^ 2) / mean((REV.test$LnHousePrice - ln.test.avg) ^
+                                                                        2)
+gam.test.r2 = 1 - mean((REV.test$HousePrice - gam.pred) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                      2)
+regtree.test.r2 = 1 - mean((REV.test$HousePrice - regtree.prune.pred ) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                               2)
+bagging.test.r2 = 1 - mean((REV.test$HousePrice - pred.bagging) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                              2)
+randomforest.test.r2 = 1 - mean((REV.test$HousePrice - pred.rf3.test) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                               2)
+boosting.test.r2 = 1 - mean((REV.test$HousePrice - pred.boosting) ^ 2) / mean((REV.test$HousePrice - test.avg) ^
+                                                                                2)</code></pre>
+<pre class="r"><code>R2.plot &lt;-
+  barplot(
+    c(
+      lm.test.r2,
+      ln.test.r2,
+      ln.bestsubset.r2,
+      ridge.test.r2,
+      lasso.test.r2,
+      pcr.test.r2,
+      pls.test.r2,
+      gam.test.r2,
+      regtree.test.r2,
+      bagging.test.r2,
+      randomforest.test.r2,
+      boosting.test.r2
+    ),
+    col = &quot;darkblue&quot;,
+    names.arg = c(
+      &quot;OLS&quot;,
+      &quot;LnOLS&quot;,
+      &quot;Subset&quot;,
+      &quot;Ridge&quot;,
+      &quot;Lasso&quot;,
+      &quot;PCR&quot;,
+      &quot;PLS&quot;,
+      &quot;GAM&quot;,
+      &quot;RegTree&quot;,
+      &quot;Bagging&quot;,
+      &quot;RF&quot;,
+      &quot;Boosting&quot;
+    ),
+    main = &quot;Test R-squared&quot;
+  )</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-30-1.png" width="672" /></p>
+</div>
+<div id="mse" class="section level1">
+<h1>MSE</h1>
+<pre class="r"><code>lm.MSE &lt;- mean((REV.test$HousePrice - lm.pred) ^ 2)
+ln.MSE &lt;- mean((REV.test$HousePrice - (exp(ln.pred))) ^ 2)
+ln.bestsubset.MSE &lt;-
+  mean((REV.test$HousePrice - (exp(
+    lm.REV.bestsubset.test
+  ))) ^ 2)
+ridge.MSE &lt;- mean((REV.test$HousePrice - (exp(ridge.pred1))) ^ 2)
+lasso.MSE &lt;- mean((REV.test$HousePrice - (exp(lasso.pred1))) ^ 2)
+pcr.MSE &lt;- mean((REV.test$HousePrice - (exp(pcr.pred))) ^ 2)
+pls.MSE &lt;- mean((REV.test$HousePrice - (exp(pls.pred))) ^ 2)
+gam.MSE &lt;- mean((REV.test$HousePrice - gam.pred) ^ 2)
+regtree.MSE &lt;- mean((REV.test$HousePrice - regtree.prune.pred) ^ 2)
+bagging.MSE &lt;- mean((REV.test$HousePrice - pred.bagging) ^ 2)
+randomforest.MSE &lt;- mean((REV.test$HousePrice - pred.rf3.test) ^ 2)
+boosting.MSE &lt;- mean((REV.test$HousePrice - pred.boosting) ^ 2)
+MSE.plot &lt;-
+  barplot(
+    c(
+      lm.MSE,
+      ln.MSE,
+      ln.bestsubset.MSE,
+      ridge.MSE,
+      lasso.MSE,
+      pcr.MSE,
+      pls.MSE,
+      gam.MSE,
+      regtree.MSE,
+      bagging.MSE,
+      randomforest.MSE,
+      boosting.MSE
+    ),
+    col = &quot;red&quot;,
+    names.arg = c(
+      &quot;OLS&quot;,
+      &quot;LnOLS&quot;,
+      &quot;Subset&quot;,
+      &quot;Ridge&quot;,
+      &quot;Lasso&quot;,
+      &quot;PCR&quot;,
+      &quot;PLS&quot;,
+      &quot;GAM&quot;,
+      &quot;RegTree&quot;,
+      &quot;Bagging&quot;,
+      &quot;RF&quot;,
+      &quot;Boosting&quot;
+    ),
+    main = &quot;Test MSE&quot;
+  )</code></pre>
+<p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-31-1.png" width="672" /></p>
+</div>
