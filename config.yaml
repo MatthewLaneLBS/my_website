@@ -99,7 +99,7 @@ params:
         title: Group Project 2
         url: blogs/ipsum
       - image: Westminster.jpg
-       subtitle: Click to view markdown file of my third group project for Data Analytics for Finance
+        subtitle: Click to view markdown file of my third group project for Data Analytics for Finance
         title: Group Project 3
         url: blogs/ipsum
 #  two:
