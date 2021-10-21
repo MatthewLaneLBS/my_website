@@ -5,18 +5,20 @@ categories:
 date: "2021-10-20"
 description: Prediction of House Prices in New Taipei City, Taiwan # the title that will show up once someone gets to this page
 draft: false
-image: Exeter.jpg # save picture in \static\img\blogs. Acceptable formats= jpg, jpeg, or png . Your iPhone pics wont work
+image: R2_MSE.jpg # save picture in \static\img\blogs. Acceptable formats= jpg, jpeg, or png . Your iPhone pics wont work
 
 keywords: ""
 slug: house_price_prediction # slug is the shorthand URL address... no spaces plz
-title: Machine Learning Project
+title: Machine Learning Project (BEE3036 - Machine Learning for Economics (University of Exeter))
 ---
 
 
 
-<div id="final-assignment" class="section level1">
-<h1>Final Assignment</h1>
-<p>rm(list = ls())</p>
+<div id="machine-learning-assignment" class="section level1">
+<h1>Machine Learning Assignment</h1>
+<p>The following code is from my final year Machine Learning for Economics module at the Universiy of Exeter.</p>
+<p>I took a set of house prices for the Sindian District, New Taipei City - as well as other local variables, such as distance to MRT station, house age, longitude and latitude - and attempted to predict these house prices using 12 machine learning methods.</p>
+<p>The Random Forest method achieved the best result, capturing around 75% of the price variability with an expected error of approx 17%. Scroll to the bottom to see a plot of every methods’ R-squared and MSE values.</p>
 <pre class="r"><code>rm(list = ls())
 library(MASS)
 library(ISLR)
@@ -113,7 +115,9 @@ RealEstateValuation_Data_$`X6 longitude` = NULL
 RealEstateValuation_Data_$`Y house price of unit area` = NULL
 
 View(RealEstateValuation_Data_)</code></pre>
-<p>###Data and Exploratory Analysis ###</p>
+</div>
+<div id="data-and-exploratory-analysis" class="section level1">
+<h1>Data and Exploratory Analysis</h1>
 <pre class="r"><code>describe(RealEstateValuation_Data_) #gives us: the top 5 max values, bottom 5 minimum values, mean, quantiles, observations, missing observations.</code></pre>
 <pre><code>## RealEstateValuation_Data_ 
 ## 
@@ -478,15 +482,15 @@ plot(RealEstateValuation_Data_$Latitude,
 <p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-7-3.png" width="672" /></p>
 <pre class="r"><code>hist(RealEstateValuation_Data_$HousePrice)</code></pre>
 <p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-7-4.png" width="672" /></p>
-<div id="machine-learning-methods" class="section level3">
-<h3>Machine Learning Methods</h3>
+</div>
+<div id="machine-learning-methods" class="section level1">
+<h1>Machine Learning Methods</h1>
 <pre class="r"><code># Separating the data into train &amp; test, decide on the method
 set.seed(10)
 train &lt;-
   sample(1:289, 289) # Taking the first 289 observations(70% of the data for training)
 REV.train &lt;- RealEstateValuation_Data_[train, ] # 289 obvs
 REV.test &lt;- RealEstateValuation_Data_[-train, ] # 125 obvs</code></pre>
-</div>
 <div id="multiple-linear-regression" class="section level2">
 <h2>Multiple linear regression</h2>
 <pre class="r"><code>set.seed(10)
@@ -799,10 +803,8 @@ points(
 ##   -4.665529e+02    1.358373e-01   -6.976565e-03   -1.494696e-04    2.766358e-02 
 ##        Latitude 
 ##    7.883011e+00</code></pre>
-</div>
-</div>
-<div id="forward-stepwise-selection" class="section level1">
-<h1>Forward Stepwise Selection</h1>
+<div id="forward-stepwise-selection" class="section level3">
+<h3>Forward Stepwise Selection</h3>
 <pre class="r"><code>reg.fwd &lt;-
   regsubsets(
     LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
@@ -879,8 +881,8 @@ points(
 ##        Latitude 
 ##    8.822385e+00</code></pre>
 </div>
-<div id="backward-stepwise-selection" class="section level1">
-<h1>Backward stepwise selection</h1>
+<div id="backward-stepwise-selection" class="section level3">
+<h3>Backward stepwise selection</h3>
 <pre class="r"><code>reg.bwd &lt;-
   regsubsets(
     LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
@@ -994,12 +996,12 @@ mean((REV.test$HousePrice - (exp(
                                                                         2)
 ln.bestsubset.r2 # R-squared = 0.6992486</code></pre>
 <pre><code>## [1] 0.6992486</code></pre>
+</div>
+</div>
 <div id="ridge-and-lasso" class="section level2">
 <h2>Ridge and Lasso</h2>
-</div>
-</div>
-<div id="ridge" class="section level1">
-<h1>Ridge</h1>
+<div id="ridge" class="section level3">
+<h3>Ridge</h3>
 <pre class="r"><code>set.seed(10)
 
 train.X &lt;-
@@ -1084,8 +1086,8 @@ mean((exp(ridge.pred2) - REV.test$HousePrice) ^ 2)  # 71.8387, MSE goes up quite
 <pre><code>## [1] 71.8387</code></pre>
 <pre class="r"><code>rss.ridge &lt;- mean((ridge.pred1 - REV.test$LnHousePrice) ^ 2)</code></pre>
 </div>
-<div id="lasso-regression" class="section level1">
-<h1>Lasso regression</h1>
+<div id="lasso-regression" class="section level3">
+<h3>Lasso regression</h3>
 <pre class="r"><code>lasso.mod &lt;-
   glmnet(train.X,
          REV.train$LnHousePrice,
@@ -1138,12 +1140,12 @@ lasso.test.r2 = 1 - mean((REV.test$LnHousePrice - lasso.pred1) ^ 2) / mean((REV.
                                                                              2)
 lasso.test.r2</code></pre>
 <pre><code>## [1] 0.7001443</code></pre>
-<div id="pcr-and-pls" class="section level3">
-<h3>PCR and PLS</h3>
 </div>
 </div>
-<div id="pcr" class="section level1">
-<h1>PCR</h1>
+<div id="pcr-and-pls" class="section level2">
+<h2>PCR and PLS</h2>
+<div id="pcr" class="section level4">
+<h4>PCR</h4>
 <pre class="r"><code>set.seed(10)
 pcr.mod &lt;-
   pcr(
@@ -1181,8 +1183,8 @@ pcr.test.r2 &lt;-
 pcr.test.r2</code></pre>
 <pre><code>## [1] 0.676837</code></pre>
 </div>
-<div id="pls" class="section level1">
-<h1>PLS</h1>
+<div id="pls" class="section level3">
+<h3>PLS</h3>
 <pre class="r"><code>pls.mod &lt;-
   plsr(
     LnHousePrice ~ TransactionDate + HouseAge + MRTDist + StoreNum + Latitude + Longitude,
@@ -1216,8 +1218,10 @@ pcr.test.r2 = 1 - mean((REV.test$LnHousePrice - pcr.pred) ^ 2) / mean((REV.test$
                                                                         2)
 pcr.test.r2</code></pre>
 <pre><code>## [1] 0.6768346</code></pre>
-<div id="gam" class="section level3">
-<h3>GAM</h3>
+</div>
+</div>
+<div id="gam" class="section level2">
+<h2>GAM</h2>
 <pre class="r"><code># FIND TOP 3 REGRESSORS AND THEN WORK OUT OPTIMAL SPLITS/NO. LOCAL REGRESSIONS, check best variables using subset results #
 reg.full &lt;-
   regsubsets(
@@ -2211,8 +2215,8 @@ gam.test1.r2 # = 0.6677571</code></pre>
 <pre><code>## [1] 0.6677571</code></pre>
 <p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-24-2.png" width="672" /></p>
 </div>
-<div id="regression-tree" class="section level3">
-<h3>Regression Tree</h3>
+<div id="regression-tree" class="section level2">
+<h2>Regression Tree</h2>
 <pre class="r"><code>dim(RealEstateValuation_Data_)</code></pre>
 <pre><code>## [1] 414   9</code></pre>
 <pre class="r"><code>set.seed(10)
@@ -2282,12 +2286,10 @@ mean((REV.test$HousePrice - regtree.prune.pred) ^ 2) # Marginal Improvement in M
 regtree.prune.r2 # = 0.6475803</code></pre>
 <pre><code>## [1] 0.6475803</code></pre>
 </div>
-<div id="bagging-random-forests-and-boosting" class="section level3">
-<h3>Bagging, Random Forests and Boosting</h3>
-</div>
-</div>
-<div id="bagging" class="section level1">
-<h1>Bagging</h1>
+<div id="bagging-random-forests-and-boosting" class="section level2">
+<h2>Bagging, Random Forests and Boosting</h2>
+<div id="bagging" class="section level3">
+<h3>Bagging</h3>
 <pre class="r"><code>set.seed(10)
 bagging.REV &lt;-
   randomForest(
@@ -2324,8 +2326,8 @@ bagging.test1.r2 # = 0.7031235</code></pre>
 <pre class="r"><code>varImpPlot(bagging.REV)</code></pre>
 <p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-26-1.png" width="672" /></p>
 </div>
-<div id="random-forests" class="section level1">
-<h1>Random Forests</h1>
+<div id="random-forests" class="section level3">
+<h3>Random Forests</h3>
 <pre class="r"><code>set.seed(10)
 rf0.REV &lt;-
   randomForest(
@@ -2436,8 +2438,9 @@ rf3.REV</code></pre>
 <pre class="r"><code>varImpPlot(rf3.REV)</code></pre>
 <p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-27-1.png" width="672" /></p>
 </div>
-<div id="boosting" class="section level1">
-<h1>Boosting</h1>
+</div>
+<div id="boosting" class="section level2">
+<h2>Boosting</h2>
 <pre class="r"><code>set.seed(10)
 
 lambda &lt;- 10 ^ seq(from = -5, to = -0.5, by = 0.05) # shrinkage parameter
@@ -2483,12 +2486,12 @@ boosting.test.r2 = 1 - mean((REV.test$HousePrice - pred.boosting) ^ 2) / mean((R
                                                                                 2)
 boosting.test.r2</code></pre>
 <pre><code>## [1] 0.6893582</code></pre>
-<div id="method-comparison" class="section level3">
-<h3>Method Comparison</h3>
 </div>
 </div>
-<div id="r-squared" class="section level1">
-<h1>R-squared</h1>
+<div id="method-comparison" class="section level1">
+<h1>Method Comparison</h1>
+<div id="r-squared" class="section level2">
+<h2>R-squared</h2>
 <pre class="r"><code>par(mfrow = c(1, 1))
 test.avg = mean(REV.test$HousePrice)
 ln.test.avg = mean(REV.test$LnHousePrice)
@@ -2553,8 +2556,8 @@ boosting.test.r2 = 1 - mean((REV.test$HousePrice - pred.boosting) ^ 2) / mean((R
   )</code></pre>
 <p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-30-1.png" width="672" /></p>
 </div>
-<div id="mse" class="section level1">
-<h1>MSE</h1>
+<div id="mse" class="section level2">
+<h2>MSE</h2>
 <pre class="r"><code>lm.MSE &lt;- mean((REV.test$HousePrice - lm.pred) ^ 2)
 ln.MSE &lt;- mean((REV.test$HousePrice - (exp(ln.pred))) ^ 2)
 ln.bestsubset.MSE &lt;-
@@ -2604,4 +2607,5 @@ MSE.plot &lt;-
     main = &quot;Test MSE&quot;
   )</code></pre>
 <p><img src="/blogs/house_price_prediction_files/figure-html/unnamed-chunk-31-1.png" width="672" /></p>
+</div>
 </div>
