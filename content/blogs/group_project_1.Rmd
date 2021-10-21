@@ -9,7 +9,7 @@ image: pic10.jpg # save picture in \static\img\blogs. Acceptable formats= jpg, j
 
 keywords: ""
 slug: group_project_1 # slug is the shorthand URL address... no spaces plz
-# title: 
+title: Group Project 1 
 ---
 ---
 title: "Session 2: Homework 1"
