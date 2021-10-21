@@ -90,15 +90,15 @@ params:
         subtitle: Rmd file calculating Risk-Return trade for DJIA stocks
         title: Risk Return Analysis
         url: blogs/risk_return
-      - image: picCW.jpg
+      - image: lbs.jpg
         subtitle: Click to view markdown file of my first group project for Data Analytics for Finance
         title: Group Project 1
         url: blogs/group_project_1
-      - image: picCfL.jpg
+      - image: pic09L.jpg
         subtitle: Click to view markdown file of my second group project for Data Analytics for Finance
         title: Group Project 2
         url: blogs/group_project_2
-      - image: picW.jpg
+      - image: pic10.jpg
         subtitle: Click to view markdown file of my third group project for Data Analytics for Finance
         title: Group Project 3
         url: blogs/group_project_3
