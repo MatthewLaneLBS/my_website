@@ -5,11 +5,11 @@ categories:
 date: "2021-10-20"
 description: Prediction of House Prices in New Taipei City, Taiwan # the title that will show up once someone gets to this page
 draft: false
-image: Exeter.jpg # save picture in \static\img\blogs. Acceptable formats= jpg, jpeg, or png . Your iPhone pics wont work
+image: R2_MSE.jpg # save picture in \static\img\blogs. Acceptable formats= jpg, jpeg, or png . Your iPhone pics wont work
 
 keywords: ""
 slug: house_price_prediction # slug is the shorthand URL address... no spaces plz
-title: Machine Learning Project
+title: Machine Learning Project (BEE3036 - Machine Learning for Economics (University of Exeter))
 ---
   
 ```{r setup, include=FALSE}
@@ -23,6 +23,8 @@ The following code is from my final year Machine Learning for Economics module a
 I took a set of house prices for the Sindian District, New Taipei City - as well as other local variables, such as distance to MRT station, house age, longitude and latitude - and attempted to predict these house prices using 12 machine learning methods. 
 
 The Random Forest method achieved the best result, capturing around 75% of the price variability with an expected error of approx 17%. Scroll to the bottom to see a plot of every methods' R-squared and MSE values.
+
+
 
 
 ```{r}
@@ -95,7 +97,7 @@ RealEstateValuation_Data_$`Y house price of unit area` = NULL
 View(RealEstateValuation_Data_)
 ```
 
-###Data and Exploratory Analysis ###
+# Data and Exploratory Analysis #
 
 
 ```{r}
@@ -236,7 +238,7 @@ hist(RealEstateValuation_Data_$HousePrice)
 
 
 
-### Machine Learning Methods ###
+# Machine Learning Methods #
 
 ```{r}
 # Separating the data into train & test, decide on the method
@@ -404,7 +406,7 @@ coef(reg.full, 5) # Best subset is with 5 variables #
 ```
 
 
-# Forward Stepwise Selection #
+### Forward Stepwise Selection ###
 
 ```{r}
 
@@ -464,7 +466,7 @@ coef(reg.fwd, 5) # Best subset is with 5 variables #
 
 ```
 
-# Backward stepwise selection #
+### Backward stepwise selection ###
 
 ```{r}
 
@@ -547,7 +549,7 @@ ln.bestsubset.r2 # R-squared = 0.6992486
 ## Ridge and Lasso ##
 
 
-# Ridge #
+### Ridge ###
 ```{r}
 
 set.seed(10)
@@ -601,7 +603,7 @@ rss.ridge <- mean((ridge.pred1 - REV.test$LnHousePrice) ^ 2)
 
 ```
 
-# Lasso regression #
+### Lasso regression ###
 ```{r}
 
 lasso.mod <-
@@ -639,9 +641,9 @@ lasso.test.r2
 ```
 
 
-### PCR and PLS ###
+## PCR and PLS ##
 
-# PCR #
+#### PCR ###
 ```{r}
 set.seed(10)
 pcr.mod <-
@@ -666,7 +668,7 @@ pcr.test.r2
 ```
 
 
-# PLS #
+### PLS ###
 
 ```{r}
 
@@ -691,7 +693,7 @@ pcr.test.r2
 
 
 
-### GAM ###
+## GAM ##
 ```{r}
 
 # FIND TOP 3 REGRESSORS AND THEN WORK OUT OPTIMAL SPLITS/NO. LOCAL REGRESSIONS, check best variables using subset results #
@@ -770,7 +772,7 @@ gam.test1.r2 # = 0.6677571
 ```
 
 
-### Regression Tree ###
+## Regression Tree ##
 
 ```{r}
 
@@ -816,9 +818,9 @@ regtree.prune.r2 # = 0.6475803
 
 ```
 
-### Bagging, Random Forests and Boosting ###
+## Bagging, Random Forests and Boosting ##
 
-# Bagging #
+### Bagging ###
 ```{r}
 
 set.seed(10)
@@ -843,7 +845,7 @@ varImpPlot(bagging.REV)
 ```
 
 
-# Random Forests #
+### Random Forests ###
 ```{r}
 
 set.seed(10)
@@ -921,7 +923,7 @@ varImpPlot(rf3.REV)
 ```
 
 
-# Boosting #
+## Boosting ##
 
 ```{r}
 
@@ -971,9 +973,9 @@ boosting.test.r2
 ```
 
 
-### Method Comparison ###
+# Method Comparison #
 
-# R-squared #
+## R-squared ##
 ```{r}
 
 par(mfrow = c(1, 1))
@@ -1046,7 +1048,7 @@ R2.plot <-
 ```
 
 
-# MSE #
+## MSE ##
 ```{r}
 
 lm.MSE <- mean((REV.test$HousePrice - lm.pred) ^ 2)
