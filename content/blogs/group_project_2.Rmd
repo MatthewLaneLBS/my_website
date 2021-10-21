@@ -1,0 +1,770 @@
+---
+title: "Session 4: Homework 2"
+author: "Study Group A14: Sid Chen, Yuxin Cheng, Yugyel Dorji, Katrin Haas, Nikos Katsanevakis, Matthew Lane"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    highlight: zenburn
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    code_folding: show
+    latex_engine: xelatex
+---
+
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+
+
+```
+
+
+```{r load-libraries, include=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(lubridate)
+library(here)
+library(skimr)
+library(janitor)
+library(httr)
+library(readxl)
+library(vroom)
+library(tidyquant)
+library(scales)
+library(tm)
+library(ggtext)
+```
+
+
+
+
+# Global warming and political views (GSS)
+
+We want to analyze whether there are any differences between the proportion of people who believe the earth is getting warmer and their political ideology. As usual, from the survey sample data, we will use the proportions to estimate values of *population parameters*. The file has 2253 observations on the following 2 variables:
+
+- `party_or_ideology`: a factor (categorical) variable with levels Conservative Republican, Liberal Democrat, Mod/Cons Democrat, Mod/Lib Republican
+- `response` : whether the respondent believes the earth is warming or not, or Don't know/ refuse to answer
+
+```{r, read_global_warming_pew_data}
+global_warming_pew <- read_csv(here::here("data", "global_warming_pew.csv"))
+```
+
+We find that there are three possible responses in the data set :
+
+- Earth is warming
+- Not warming
+- Don't know / refuse to answer
+
+```{r}
+global_warming_pew_long <- global_warming_pew %>% 
+  count(party_or_ideology, response)
+
+global_warming_pew_long
+```
+
+We will be constructing three 95% confidence intervals to estimate population parameters, for the % who believe that **Earth is warming**, according to their party or ideology.
+
+We transpose the data set to have responses per party, disregarding "Don't know / refuse to answer". We then create a 95% confidence intervals for the the percentage of people believing in Global Warming according to their political standpoint.
+
+```{r}
+global_warming_pew_wide <- global_warming_pew_long %>% 
+  pivot_wider(names_from = response, # we pivot wide to have responses per party
+              values_from = n) %>% 
+select("party_or_ideology", "Earth is warming", "Not warming") # we do not pick "Don't know / refuse to answer" responses
+
+colnames(global_warming_pew_wide)[2:3] <- c("warming", "not_warming") 
+
+global_warming_pew_wide <- global_warming_pew_wide %>%
+  mutate(count = warming + not_warming, #calculate CI using formula by hand
+         p_hat = warming/count,
+         se = sqrt(p_hat * (1 - p_hat)/count),
+         z_critical = qt(0.975, count - 1),
+         lower = p_hat - z_critical * se,
+         upper = p_hat + z_critical * se)
+
+global_warming_pew_wide
+
+```
+
+We include a visualisation of the final dataset which shows that party allegiance is an indicator of global warming recognition. 
+
+```{r, fig.width = 7, fig.height = 3}
+
+global_warming_pew_wide %>% 
+  arrange(desc(p_hat)) %>% 
+  ggplot(aes(x = p_hat,
+             y = fct_reorder(party_or_ideology, p_hat),
+             color = party_or_ideology)) +
+  geom_point() +
+  
+#Use geom_errorbarh to dipict the confidence interval  
+  geom_errorbarh(aes(xmin = lower,
+                 xmax = upper)) +
+  scale_x_continuous(label = scales::percent) +
+  labs(x = "Probabilty of Answering Earth is warming",
+       y = "Party or Ideology") +
+  theme_bw() +
+  theme(text = element_text(size = 10),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        plot.margin = unit(c(5.5, 30, 5.5, 5.5), "points"))    #Specify margin to avoid cut-off of the legend
+
+```
+
+To make sure, let's run `prop.test` to test if there are significant differences among four groups' population mean.
+
+```{r}
+#Test for significant difference
+prop.test(x = global_warming_pew_wide$warming,
+          n = global_warming_pew_wide$count,
+          conf.level = 0.95)
+```
+
+The p-value is very small, indicating we can reject the null hypothesis of equality in proportions of the four groups' population mean.
+
+Given our samples and reading on [The challenging politics of climate change](https://www.brookings.edu/research/the-challenging-politics-of-climate-change/), we can interpret that there is a high level of correlation between party ideology and belief in global warming. The more we move to the centre left of the political landscape, the more it seems that people acknowledge the fact that the temperature on our planet is becoming warmer. This is generally a theme in US politics, as republican leaders tend to undermine the importance of climate change, with their voters following suit.
+
+What we need to point out though, is the difference in the samples. Although we would expect liberal democrats to be more sensitive regarding global warming, it is a much smaller sample compared to the conservative republican and mod/cons democrats. The same issue goes even more obvious for mod/lib republican. Therefore, we have a clearer picture for conservative republicans and mod/cons democrats, where the first group definitely disregard global warming while the latter recognise it as an important problem.
+
+
+# Biden's Approval Margins
+
+fivethirtyeight.com has detailed data on [all polls that track the president's approval ](https://projects.fivethirtyeight.com/biden-approval-ratings). We load data for Biden's approval ratings modify it for dates to display correctly.
+
+```{r, cache=TRUE}
+# Import approval polls data directly off fivethirtyeight website
+approval_polllist <- read_csv('https://projects.fivethirtyeight.com/biden-approval-data/approval_polllist.csv') 
+
+# Use `lubridate` to fix dates, as they are given as characters.
+approval_polllist <- approval_polllist %>%
+  mutate(modeldate = mdy(modeldate),
+         startdate = mdy(startdate),
+         enddate = mdy(enddate),
+         createddate = mdy(createddate),
+         timestamp = hms(timestamp))
+
+glimpse(approval_polllist)
+```
+
+## Create a plot
+
+As a next step, we calculate the average net approval rate (`approve` - `disapprove`) for each week since he got into office. We plot the net approval, along with its 95% confidence interval. There are various dates given for each poll, so we use `enddate`, i.e., the date the poll ended.
+
+Our final plot should look similar to this:
+
+```{r trump_margins, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "biden_approval_margin.png"), error = FALSE)
+```
+
+We produce a table called `weekly_approval` with Biden's average net approval rating for every week he has been president. Then we calculate the 95% CIs. Before that, we check the differrent subgroups of polls in order to avoid duplicates.
+```{r}
+approval_polllist %>% 
+  count(subgroup)
+```
+
+
+
+```{r}
+# Calculate the weekly net approval rate
+weekly_approval <- approval_polllist %>%
+
+#filter the data because there can be more than 1 results from the same poll and each result is under a different subgroup, we only choose the "All polls" subgroup because it has the most samples  
+  filter(subgroup == "All polls") %>% 
+  
+#select only relevant data
+  select(president, enddate, samplesize, approve, disapprove, poll_id, question_id) %>% 
+  
+  mutate(net_approval = approve - disapprove, #calculate net approval
+         week = week(enddate)) %>%  #get week of the year (data is only for 2021)
+  
+#calculate weekly mean and confidence interval
+  group_by(week) %>% 
+  summarise(mean_net_approval = mean(net_approval),
+            sd_net_approval = sd(net_approval),
+            count = n(),
+            t_critical = qt(0.975, count - 1),
+            se_net_approval = sd_net_approval/sqrt(count),
+            margin_of_error = t_critical * se_net_approval,
+            net_approval_low = mean_net_approval - margin_of_error,
+            net_approval_high = mean_net_approval + margin_of_error)
+
+head(weekly_approval)
+```
+
+We plot the net approvals as a next step and find a diminishing trend. This could probably be explained by the recent political disaster at Afghanistan and the fact that US needs to borrow more money to comply with its outstanding bond payments.
+
+```{r, fig.width=12, fig.height=8}
+#plot including week 7
+ggplot(weekly_approval, aes(x = week, y = mean_net_approval)) +
+  geom_point(color = 'orangered') +
+  geom_smooth(se = F) +
+  geom_line(color = 'orangered',
+            size = 0.2,
+            alpha = 0.6) +
+  
+#add a horizontal line for 0 (approval = disapproval)
+  geom_line(aes(x = week, y = 0),
+            color = 'orange',
+            size = 2) +
+  
+#use geom_ribbon to depict confidence intervals
+  geom_ribbon(aes(ymin = net_approval_low,
+                  ymax = net_approval_high),
+              fill = 'black',
+              color = 'red',
+              alpha = 0.1,
+              size = 0.2) +
+  
+#change vertical gridlines
+  scale_y_continuous(breaks = seq(-10, 20, by = 2.5),
+                     minor_breaks = seq(-10, 20, 1.25)) +
+  scale_x_continuous(breaks = seq(3, 39, by = 12),
+                     minor_breaks = seq(3, 39, 6)) +
+  
+#some formatting
+  ggplot2::annotate("text",
+           x = 21, y = 30,
+           label = "2021",
+           size = 4)+
+  theme_bw() +
+  theme(title = element_text(size = 12),
+        panel.border = element_blank()) +
+  coord_cartesian(ylim = c(-12, 30))+
+  labs(title = 'Estimating Approval Margin (approve-disapprove) for Joe Biden',
+       subtitle = "Weekly average of all polls",
+       x = "Week of the year", 
+       y = "Average Approval Margin (Approve - Disapprove)") +
+  NULL
+```
+
+## Compare Confidence Intervals
+
+From the graph we can clearly see that the confidence interval for week 25 is considerably smaller than for week 3, indicated by the grey area around it and the orange borders. Looking at the `weekly_approval` table, we see that the boundaries of the confidence interval for week 25 are (9.79, 13.47), whereas it is (6.96, 29.03) for week 3. This difference can be explained by the sample size we have for the two weeks. For week 3, we only have 5 polls whereas for week 25 we have 29. Given that the formula to calculate the margin of error is $t \frac{s}{\sqrt{n}}$ where t is the critical t-value based on the t distribution that increases with decreasing degrees of freedom ($n-1$). In addition, the standard error $\frac{s}{\sqrt{n}}$ is larger with a smaller $n$. This means that the confidence interval will be smaller the higher our sample size, which is also what we see when we compare the intervals for week 3 and week 25.
+
+# Challenge 1: Excess rentals in TfL bike sharing
+
+We get the TfL latest data by running the following, and create a dataset on how many bikes were hired every day.
+
+```{r, get_tfl_data, cache=TRUE}
+url <- "https://data.london.gov.uk/download/number-bicycle-hires/ac29363e-e0cb-47cc-a97a-e216d900a6b0/tfl-daily-cycle-hires.xlsx"
+
+# Download TFL data to temporary file
+httr::GET(url, write_disk(bike.temp <- tempfile(fileext = ".xlsx")))
+
+# Use read_excel to read it as dataframe
+bike0 <- read_excel(bike.temp,
+                   sheet = "Data",
+                   range = cell_cols("A:B"))
+
+# change dates to get year, month, and week
+bike <- bike0 %>% 
+  clean_names() %>% 
+  rename (bikes_hired = number_of_bicycle_hires) %>% 
+  mutate (year = year(day),
+          month = lubridate::month(day, label = TRUE),
+          week = isoweek(day))
+```
+
+We can easily create a facet grid that plots bikes hired by month and year.
+
+```{r tfl_month_year_grid, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "tfl_distributions_monthly.png"), error = FALSE)
+```
+
+First let's reproduce the graph above (and update it to the most recent dataset).
+
+```{r, fig.width = 10, fig.height = 4.5}
+
+#Create a density plot
+bike %>% 
+  filter(year >= 2015) %>% 
+  ggplot(aes(x = bikes_hired)) +
+  geom_density() +
+  
+#Facet by year and month
+  facet_grid(rows = vars(year),
+             cols = vars(month)) +
+  
+#Set the x-lab into units of K(thousand)
+  scale_x_continuous(label = scales::label_number(suffix = "K",
+                                                  scale = 0.001)) +
+  
+#Some formatting
+  labs(x = "Bike Rentals",
+       y = NULL,
+       title = "Distribution of bikes hired per month")+
+  theme_bw() +
+  theme(text = element_text(size = 11),
+        strip.background = element_rect(color = NA,
+                                        fill = NA),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(size = 7),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  NULL
+
+```
+
+
+In May and June 2020, the distributions of daily bike rentals are visually flatter, and more uniformly distributed, than other months. Compared to previous and preceding months, May and June have several observations of low volumes of bikes being hired, likely due to the Covid-19 stay at home orders being ordered by the government, however these restrictions were phased out in June with non-essential shops and schools reopening. We believe this is reflected in the data by the more consistent distribution of daily rental volume than compared to other months.
+
+For instance, during restricted periods we expect daily bike rental figures were low between 20-40k due to sociable/voluntary rental being banned and only key workers or those who cannot work from home using bikes to commute - other means of public transport were restricted or banned. However, once restrictions were relaxed we expect large numbers of bikes were rented by households who wanted to enjoy their new found freedoms outside of their homes. Consequently, because the rental figures were split somewhat equally across the distribution and not in a concentrated manner we see little positive kurtosis or concentration in the distribution creating a somewhat flat distribution different to other months.
+
+Simply, the distribution caused to daily life has meant there is a wider spread of daily bike rentals over the two months and so neither possesses a histogram distribution similar to those of other months. 
+
+To better understand the excess rental phenomena, we will reproduce the two graphs below, one on monthly change and the other on weekly change from the expected level of monthly or weekly rentals. The two grey shaded rectangles in the second graph correspond to Q2 (weeks 14-26) and Q4 (weeks 40-52).
+
+```{r tfl_absolute_monthly_change, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "tfl_monthly.png"), error = FALSE)
+```
+
+```{r tfl_percent_change, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "tfl_weekly.png"), error = FALSE)
+```
+
+The expected number of rentals per week or month is calculated from data between 2016-2019 and we will see how each week or month of 2020-2021 compares to the expected rentals. We think of the calculation `excess_rentals = actual_rentals - expected_rentals`.
+
+To decide whether we use mean or median to represent expected level of bike rentals, let's first graph a box plot to see how daily data are distributed.
+
+```{r}
+
+#Create a boxplot to see the pattern of distribution in 2016-2019
+bike %>% 
+  filter(year >= 2016, year <= 2019) %>% 
+  ggplot(aes(y = bikes_hired)) +
+  facet_wrap(~year,
+             nrow = 2) +
+  geom_boxplot() +
+  NULL
+
+```
+
+We can see that the distributions of daily rentals in 2016-2019 are not very skewed and there are few outliers in the dataset. In this case, considering mean has a better statistical implication than median, we decide to use monthly or weekly mean as our expected levels of bike rentals.
+
+We will first play with our daily data to make a monthly summary of bike rentals and make some transformation for the purpose of further plotting.
+
+```{r}
+#Summarize mean of rentals by month
+bike_monthly <- bike %>% 
+  filter(year >= 2016) %>% 
+  group_by(year, month) %>% 
+  summarize(bikes_hired_monthly_mean = mean(bikes_hired))
+
+#Calculate the expected monthly rentals, i.e. the mean of monthly mean in 2016-2019
+bike_monthly_expected <- bike_monthly %>% 
+  filter(year <= 2019) %>% 
+  group_by(month) %>% 
+  summarize(bikes_hired_monthly_expected = mean(bikes_hired_monthly_mean))
+
+#Incorporate the expected monthly rentals to bike_monthly
+bike_monthly <- left_join(bike_monthly,
+                          bike_monthly_expected, 
+                          by = "month")
+
+#Create two new columns for excess(+/-) rentals per month compared with expected levels
+bike_monthly <- bike_monthly %>% 
+  mutate(bikes_hired_monthly_excess = pmax(bikes_hired_monthly_mean - bikes_hired_monthly_expected, 0),
+         bikes_hired_monthly_shortage = pmax(bikes_hired_monthly_expected - bikes_hired_monthly_mean, 0))
+
+head(bike_monthly)
+```
+
+Now we can reproduce the first graph.
+
+```{r, fig.width = 15, fig.height = 11.25}
+#Lines for actual monthly rentals and expected monthly rentals
+ggplot(bike_monthly, 
+       aes(x = month)) +
+  geom_line(aes(y = bikes_hired_monthly_mean,
+                group = 1)) +
+  geom_line(aes(y = bikes_hired_monthly_expected,
+                group = 1),
+            size = 1.5,
+            color = "blue") +
+  facet_wrap(~ year) +
+  
+#Use geom_ribbon for excess and shortage compared with expected levels
+  geom_ribbon(aes(ymin = bikes_hired_monthly_expected,
+                  ymax = bikes_hired_monthly_expected + bikes_hired_monthly_excess,
+                  group = 1),
+              fill = "green4",
+              alpha = 0.25) +
+  geom_ribbon(aes(ymin = bikes_hired_monthly_expected - bikes_hired_monthly_shortage,
+                  ymax = bikes_hired_monthly_expected,
+                  group = 1),
+              fill = "red3",
+              alpha = 0.25) +
+  
+#Some formatting
+  scale_y_continuous(label = scales::comma,
+                     limits = c(13000, NA)) +
+  labs(x = "Month",
+       y = "Bike Rentals",
+       title = "Monthly changes in TfL bike rentals",
+       subtitle = "Change from monthly average shown in blue \nand calculated between 2016-2019",
+       caption = "Source: TfL, London Data Store") +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        strip.background = element_rect(color = NA,
+                                        fill = NA),
+        panel.border = element_blank()) +
+  NULL
+
+```
+
+The graph above depicts expected and real monthly changes in bike rentals across London. The blue line shows the expected daily number of bikes rented for a given month and the black line represents the actual number. The green or red fill shows the excess or under-use of bikes for that month compared to the expected figure.
+
+- The graph shows that for 2016, 2017 and 2019 actual usage is approximately in-line with expectation with an equal distribution of months marginally above and below expectation.
+
+- For 2018, June and July are considerable above expectation, however when compared to weather reports for those months this is perhaps expected. The summer of 2018 was the joint average hottest ever recorded in the UK with a peak temperature of 35.3 celsius, due to this a large excess of rentals is justified and in line with expectation. 
+
+- As expected, 2020 and 2021 deviate from expectation considerably several times, almost certainly due to the Covid-19 pandemic. In March and April 2020, actual rental figures were well below expectation, likely because of the stay at home order issued by the UK government during these months. Then for May and June the daily rental average jumped sharply from <20k to >35k, this time likely due to the relaxation of some restrictions as well as key workers and those who couldn't work from home commuting using bikes as other public transport provision was reduced or canceled. September 2020 was also well above expectation, likely due to the imposition of the "Rule of 6" for indoor and outdoor gatherings as well as behavioural changes in society - people looking to spend more time outside of their homes and outdoors in general having been forced to remain at home for many weeks. The rest of 2020 was fairly in line with expectation despite a circuit-breaker lockdown but this could be because the expectation of daily rentals dropped sharply already. 
+
+- So far in 2021, only January and February have been well below expectation. This is likely due to the third national lockdown imposed by the government forcing households to remain at home. Since the relaxing of restrictions average daily rentals have remained somewhat in line with expectation. 
+
+We then do the same with weekly data but calculate excess(+/-) rentals as percent of expected weekly rentals.
+
+Before building the dataset, we first need to check if our previous steps have correctly categorized data for week 1, 52 and 53. It is highly possible that the first few days of a year is labelled week 52 or 53 for the previous year, or the last few days of a year is labelled week 1 for the next year. Obviously you can't have 10 days in your week 52 data.
+
+```{r}
+
+#Display all week 1, 52 and 53 data
+bike %>%
+  filter(year >= 2016,
+         week %in% c(1, 52, 53) )
+
+```
+
+Our concern is correct: the first 3 days of 2016 are categorized into week 53, but it's the week 53 of year 2015 instead of 2016. The same issue also occurs in all years in our current dataset. To rectify this, we need to change any mislabeled days in week 1, 52 or 53 and put them into the correct year.
+
+```{r}
+
+#Create a new dataset to aviod overwriting
+bike_adjust <- bike
+
+#For all week 52 and 53 data in January, move their year label to the previous year
+bike_adjust$year <- if_else(bike_adjust$week >= 52 & bike_adjust$month == "Jan",
+                            bike_adjust$year - 1,
+                            bike_adjust$year)
+
+#For all week 1 data in December, move their year label to the next year
+bike_adjust$year <- if_else(bike_adjust$week == 1 & bike_adjust$month == "Dec",
+                            bike_adjust$year + 1,
+                            bike_adjust$year)
+
+#Display all week 1, 52 and 53 data
+bike_adjust %>%
+  filter(year >= 2016,
+         week %in% c(1, 52, 53) )
+  
+```
+
+We have now taken care of the mislabeling issue. To make sure of this, let's look at how many days are in each week of each year.
+
+```{r}
+
+#Count how many days are in each week and order the table by the count
+bike_adjust %>% 
+  filter(year >= 2016) %>% 
+  group_by(year, week) %>% 
+  summarize(number_of_days = count(week)) %>% 
+  arrange(number_of_days)
+
+```
+
+Except for the week 35 of year 2021, which is our most recent data, all weeks in our `bike_adjust` dataset have 7 days. We can now proceed with further processing and visualization.
+
+Note that we only have one sample of week 53 in our current dataset, and it is in year 2020. We don't have any week 53 in 2016-2019 (except for the first 3 days of 2016, which we have already reclassified into year 2015), and therefore there is no expected weekly rentals for week 53. To address this anamoly, we just discard the week 53 data from our new dataset to avoid an `NA` value.
+
+```{r}
+
+#Summarize mean of rentals by week
+bike_weekly <- bike_adjust %>% 
+  filter(year >= 2016, week != 53) %>% 
+  group_by(year, week) %>% 
+  summarize(bikes_hired_weekly_mean = mean(bikes_hired))
+
+#Calculate the expected weekly rentals, i.e. the mean of weekly mean in 2016-2019
+bike_weekly_expected <- bike_weekly %>% 
+  filter(year <= 2019) %>% 
+  group_by(week) %>% 
+  summarize(bikes_hired_weekly_expected = mean(bikes_hired_weekly_mean))
+
+#Incorporate the expected weekly rentals to bike_weekly
+bike_weekly <- left_join(bike_weekly,
+                         bike_weekly_expected,
+                         by = "week")
+
+#Create two new columns for percentage excess(+/-) rentals per week compared with expected levels
+bike_weekly <- bike_weekly %>% 
+  mutate(bikes_hired_weekly_diff = (bikes_hired_weekly_mean - bikes_hired_weekly_expected)/bikes_hired_weekly_expected,
+         bikes_hired_weekly_excess = pmax(bikes_hired_weekly_diff, 0),
+         bikes_hired_weekly_shortage = pmin(bikes_hired_weekly_diff, 0))
+
+head(bike_weekly)
+```
+
+Now we can reproduce the second graph.
+
+```{r, fig.width = 15, fig.height = 11.25}
+
+#Line for the percentage change compared with expected weekly bike rentals
+ggplot(bike_weekly, aes(x = week)) +
+  geom_line(aes(y = bikes_hired_weekly_diff)) +
+  facet_wrap(~ year) +
+
+#Use geom_ribbon for percentage excess and shortage compared with expected levels   
+  geom_ribbon(aes(ymin = 0,
+                  ymax = bikes_hired_weekly_excess),
+              fill = "green4",
+              alpha = 0.25) +
+  geom_ribbon(aes(ymin = bikes_hired_weekly_shortage,
+                  ymax = 0),
+              fill = "red3",
+              alpha = 0.25) +
+  
+#Create the two grey shaded rectangles for Q2 and Q4
+#geom_rect doesn't produce the desired effect in terms of alpha, so we use annotate(geom = "rect", ...) to optimize the result
+  ggplot2::annotate(geom = "rect",
+           xmin = 13, xmax = 26,
+           ymin = -Inf, ymax = Inf,
+           fill = "grey",
+           alpha = 0.25) +
+  ggplot2::annotate(geom = "rect",
+           xmin = 39, xmax = 53,
+           ymin = -Inf, ymax = Inf,
+           fill = "grey",
+           alpha = 0.25) +
+  
+#Use geom_rug for the small indicators at the bottom, with two differently sliced dataset from bike_weekly
+  geom_rug(data = bike_weekly[bike_weekly[ , "bikes_hired_weekly_excess"] != 0, ,
+                              drop = FALSE],
+           color = "green4",
+           sides = "b") +
+  geom_rug(data = bike_weekly[bike_weekly[ , "bikes_hired_weekly_shortage"] != 0, ,
+                              drop = FALSE],
+           color = "red3",
+           sides = "b") +
+  
+#Some formatting
+  scale_x_continuous(breaks = c(13, 26, 39, 52)) +
+  scale_y_continuous(label = scales::percent) +
+  labs(x = "week",
+       y = NULL,
+       title = "Weekly changes in TfL bike rentals",
+       subtitle = "% change from weekly averages \ncalculated between 2016-2019",
+       caption = "Source: TfL, London Data Store") +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        strip.background = element_rect(color = NA,
+                                        fill = NA),
+        panel.border = element_blank()) +
+  NULL
+
+```
+
+The graph above maps weekly changes in bike rentals across London from 2016 to mid-2021.
+
+- We can infer from the figure that, from 2016-2019, in general, the greatest volatility in bike usage is observed at the beginning or towards the end of the calendar year. There is likely a seasonal element to this change, less usage as the weather changes or greater usuage if there is a warm/sunny weather spell during colder months for example. It is possible to argue as well that due to lower average daily figures for these parts of the year that a fixed increase or decrease in usage would represent a larger percentage change on the figure. For example, a 2000 change in daily average bike rental for a week during the month of January will register as almost a 10% change on the weekly chart above, however an equal change for a week in July will register as almost 5% and so appear as less of change despite the raw number increase being the same as January. 
+
+- In line with expectation, 2020 was the most volatile year in terms of weekly changes out of the measurement period. In 2020 the +/-50% level was exceeded twice,this was quite remarkable given that, for the data observed, prior to 2020 the 50% level was never exceeded. The level has been exceeded once since 2020 however, in Spring 2021 a weekly rental rate was over 50% greater than the week before - this is likely a result of the relaxation of covid restrictions for hopefully the final time and the impact this had on user behaviour. 
+
+- Seasonal patterns aren't clear on this figure. There is no defined period of a calendar year where usage increases or decreases for all the observed years. For example, from week 26 to 39 there is an noticeable increase in 2016 but a clear decrease of rentals for 2017 and for other years there is contradictory changes over those weeks.
+
+In creating your plots, we found these links useful:
+
+- https://ggplot2.tidyverse.org/reference/geom_ribbon.html
+- https://ggplot2.tidyverse.org/reference/geom_tile.html 
+- https://ggplot2.tidyverse.org/reference/geom_rug.html
+
+
+# Challenge 2: How has the CPI and its components changed over the last few years?
+
+In this challenge, we will do the following:
+
+1. We can find the [CPI components at  FRED](https://fredaccount.stlouisfed.org/public/datalist/843) and have scraped the FRED website and pulled all of the CPI components into a vector.
+2. Once we have a vector of components, we can then pass it to `tidyquant::tq_get(get = "economic.data", from =  "2000-01-01")` to get all data since January 1, 2000
+3. Since the data we download is an index with various starting dates, we need to calculate the yearly, or 12-month change. To do this we use the `lag` function, and specifically, `year_change = value/lag(value, 12) - 1`; this means that we are comparing the current month's value with that 12 months ago lag(value, 12).
+4. After that, we order components so the higher the yearly change, the earlier does that component appear, but make sure that **All Items** CPI (CPIAUCSL) appears first.
+5. In order to understand the graph more easily, we also take care of some specific formatting.
+
+Having done these, we should get this graph.
+
+```{r cpi_all_components_since_2016, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "cpi_components_since_2016.png"), error = FALSE)
+```
+
+We first scrape the data from the FRED website with the following code.
+
+```{r, cache=TRUE}
+url <- "https://fredaccount.stlouisfed.org/public/datalist/843"
+library(rvest)
+library(purrr)
+library(htmlTable)
+
+tables <- url %>% 
+  read_html() %>% 
+  html_nodes(css="table")
+
+CPI_components <- purrr::map(tables, . %>% 
+             rvest::html_table(fill=TRUE)%>% 
+             janitor::clean_names())
+
+cpi_components <- CPI_components[[2]] %>% 
+  rename(component = series_id)
+
+table <- cpi_components %>% 
+  select(component) %>% 
+  pull() %>% 
+  tidyquant::tq_get(get = "economic.data", from =  "2000-01-01") %>% 
+  rename(component = symbol) %>% 
+  left_join(cpi_components, by="component") %>% 
+  select(title, component, date, price) %>% 
+  mutate(cpi_year_change = price/lag(price, 12) - 1)
+
+glimpse(table)
+```
+
+We continue with modifying the dataframe we have in order to make it ready to plot and name this new dataframe `table_to_plot`.
+
+```{r}
+
+table_to_plot <- table %>%
+  filter(year(date) >= 2016) %>% 
+  mutate(Color = if_else(cpi_year_change >= 0, "brown2", "steelblue1")) %>% #change color according to increase or decrease
+  mutate(title = substr(title, 47, length(title)), #remove first characters of title that same for every component
+         title = removeWords(title, "in U.S. City Average"), #remove words from each component
+         title = fct_relevel(
+           fct_reorder(title, cpi_year_change, max, .desc=TRUE), #order components according to yearly change
+           "All Items ", after = 0)) #set "All Items" as first component
+```
+
+Having done this, we are now able to plot the data and get a similar to the graph shown above.
+
+```{r, fig.width = 18, fig.height = 10}
+
+ggplot(data = table_to_plot,
+       aes(x = date, y = cpi_year_change, color = Color)) +
+  geom_point(size = 1, alpha = 0.6) +
+  geom_smooth(se = FALSE, size = 1, color = "darkgrey") + #add smooth line to show trend
+  facet_wrap(~title, scales = "free", nrow = 7) +
+  scale_color_identity() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1)) +
+  labs(title = "Yearly change of US CPI (All Items) and its components",
+       subtitle = "YoY change being <span style = 'color: brown2;'>positive</span> or <span style = 'color: steelblue1;'>negative</span><br>Jan 2016 to Aug 2021", #code in HTML
+       caption = "Data from St. Louis FRED\nhttps://fredaccount.stlouisfed.org/public/datalist/843",
+       y = "YoY % Change",
+       x = NULL) +
+  theme_bw() +
+  theme(text = element_text(size = 12),
+        plot.subtitle = element_markdown(), #set to markdown so that R recognizes that code written in HTML
+        plot.title = element_text(face = "bold")) +
+  NULL
+
+```
+
+This graph contains 49 different categories, but misses some very important ones such as *Education* or *Medical Care*. Since we are not able to get data for these categories from the method above, we import the provided csv file named `cpi_data.csv` and recreate the graph, which then has more categories.
+
+```{r, fig.width = 18, fig.height = 10.5}
+cpi_data <- read.csv(here::here("data", "cpi_data.csv"))
+
+cpi_data2 <- cpi_data %>% 
+  select(title, component, date, value) %>% 
+  mutate(date = ymd(date),
+         cpi_year_change = value/lag(value, 12) - 1) %>% 
+  filter(year(date) >= 2016) %>%
+  mutate(Color = ifelse(cpi_year_change >= 0, "brown2", "steelblue1"),
+         title = substr(title, 47, length(title)), #remove first characters of title that same for every component
+         title = removeWords(title, "in U.S. City Average"), #remove words from each component
+         title = fct_relevel(
+           fct_reorder(title, cpi_year_change, max, .desc=TRUE), #order components according to yearly change
+           "All Items ", after = 0)) #set "All Items" as first component
+
+ggplot(data = cpi_data2,
+       aes(x = date, y = cpi_year_change, color = Color)) +
+  geom_point(size = 1, alpha = 0.6) +
+  geom_smooth(se = FALSE, size = 1, color = "darkgrey") + #add smooth line to show trend
+  facet_wrap(~title, scales = "free", nrow = 7) +
+  scale_color_identity() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1)) +
+  labs(title = "Yearly change of US CPI (All Items) and its components",
+       subtitle = "YoY change being <span style = 'color: brown2;'>positive</span> or <span style = 'color: steelblue1;'>negative</span><br>Jan 2016 to Aug 2021", #code in HTML
+       caption = "Data from St. Louis FRED\nhttps://fredaccount.stlouisfed.org/public/datalist/843",
+       y = "YoY % Change",
+       x = NULL) +
+  theme_bw() +
+  theme(text = element_text(size = 12),
+        plot.subtitle = element_markdown(), #set to markdown so that R recognizes that code written in HTML
+        plot.title = element_text(face = "bold")) +
+  NULL
+
+```
+
+This graphs is fine, but perhaps has too many sub-categories. According to [relative importance of components in the Consumer Price Indexes: U.S. city average, December 2020](https://www.bls.gov/cpi/tables/relative-importance/2020.htm), we can choose a smaller subset of the components and only list the major categories (Housing, Transportation, Food and beverages, Medical care, Education and communication, Recreation, and Apparel), sorted according to their relative importance.
+
+
+```{r, fig.width = 10, fig.height = 4}
+#create vector to store major categories sorted according to relative importance
+CPI_major_categories <- c("All Items ", "Housing ","Transportation ", "Food and Beverages ", "Medical Care ", "Education and Communication ", "Recreation ", "Apparel ")
+
+table_major_categories <- cpi_data2 %>% 
+  filter(title %in% CPI_major_categories) %>% #filter for those categories listed above
+  mutate(title = factor(title,
+                        levels = CPI_major_categories,
+                        labels = CPI_major_categories))
+
+ggplot(table_major_categories,
+       aes(x = date, y = cpi_year_change, color = Color)) +
+  geom_point(size = 1, alpha = 0.6) +
+  geom_smooth(se = FALSE, size = 1, color = "darkgrey") + #add smooth line to show trend
+  facet_wrap(~title, scales = "free", nrow = 2) +
+  scale_color_identity() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1)) +
+  labs(title = "Yearly change of US CPI (All Items) and its major components according to their relative importance",
+       subtitle = "YoY change being <span style = 'color: brown2;'>positive</span> or <span style = 'color: steelblue1;'>negative</span><br>Jan 2016 to Aug 2021", #code in HTML
+       caption = "Data from St. Louis FRED\nhttps://fredaccount.stlouisfed.org/public/datalist/843",
+       y = "YoY % Change",
+       x = NULL) +
+  theme_bw() +
+  theme(text = element_text(size = 10),
+        plot.subtitle = element_markdown(), #set to markdown so that R recognizes that code written in HTML
+        plot.title = element_text(face = "bold")) +
+  NULL
+
+```
+
+
+
+# Details
+
+- Who did you collaborate with: team members of Study Group A14
+- Approximately how much time did you spend on this problem set: 8 hours on average for each team member
+- What, if anything, gave you the most trouble: formatting the plots and dealing with changing data pulled from the web
+
+> As a true test to yourself, do you understand the code you submitted and are you able to explain it to someone else? 
+
+> Yes.
+
+# Rubric
+
+Check minus (1/5): Displays minimal effort. Doesn't complete all components. Code is poorly written and not documented. Uses the same type of plot for each graph, or doesn't use plots appropriate for the variables being analyzed. 
+
+Check (3/5): Solid effort. Hits all the elements. No clear mistakes. Easy to follow (both the code and the output). 
+
+Check plus (5/5): Finished all components of the assignment correctly and addressed both challenges. Code is well-documented (both self-documented and with additional comments as necessary). Used tidyverse, instead of base R. Graphs and tables are properly labelled. Analysis is clear and easy to follow, either because graphs are labeled clearly or you've written additional text to describe how you interpret the output.

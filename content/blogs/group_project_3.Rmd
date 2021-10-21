@@ -1,0 +1,995 @@
+---
+title: "Session 6: Homework 3"
+author: "Study Group A14: Sid Chen, Yuxin Cheng, Yugyel Dorji, Katrin Haas, Nikos Katsanevakis, Matthew Lane"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    highlight: zenburn
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    code_folding: show
+    latex_engine: xelatex
+---
+
+
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+
+```
+
+
+```{r load-libraries, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(GGally)
+library(readxl)
+library(here)
+library(skimr)
+library(janitor)
+library(broom)
+library(tidyquant)
+library(infer)
+library(openintro)
+library(ltm) #to calculate correlation coefficient later
+```
+
+
+# Youth Risk Behavior Surveillance
+
+Every two years, the Centers for Disease Control and Prevention conduct the [Youth Risk Behavior Surveillance System (YRBSS)](https://www.cdc.gov/healthyyouth/data/yrbs/index.htm) survey, where it takes data from high schoolers (9th through 12th grade), to analyze health patterns. We will work with a selected group of variables from a random sample of observations during one of the years the YRBSS was conducted.
+
+## Load the data
+
+This data is part of the `openintro` textbook and we can load and inspect it. There are observations on 13 different variables, some categorical and some numerical.
+
+```{r}
+data(yrbss)
+glimpse(yrbss)
+```
+
+Before we carry on with your analysis, it is always a good idea to check with `skimr::skim()` to get a feel for missing values, summary statistics of numerical variables, and a very rough histogram.
+
+```{r}
+#use skimr::skim() to get feel for missing values
+skimr::skim(yrbss)
+```
+
+From the above output, we can see that our dataset contains 13,583 observations and has 13 variables of which 8 are character and 5 are numeric variables. We can also see that for many of these variables we have missing values, the highest of which is the `race` of the high schoolers where we have 2,805 missing values.
+
+## Exploratory Data Analysis
+
+We will first start with analyzing the `weight` of participants in kilograms. From the output above, we can already see that we have 1,004 missing values for the weights variable. We will first look at the distribution of weights of the high schoolers on a higher level and then look at it in more detail by grouping into gender and age. 
+
+```{r, eda_on_weight}
+
+#summary statistics of weights of all high schoolers
+yrbss %>% 
+dplyr::select(weight) %>% # there are no instances where we there is no age data but there is weight data
+  summarise(min_weight = min(weight, na.rm = TRUE), #set na.rm = TRUE to disregard observations with no weight information
+  max_weight = max(weight, na.rm = TRUE),
+  median_weight = median(weight, na.rm = TRUE),
+  mean_weight = mean(weight, na.rm = TRUE),
+  sd_weight = sd(weight, na.rm = TRUE),
+  n = n()
+  )
+
+#visualisation of distribution of weights of all high schoolers
+ggplot(yrbss, aes(x=weight)) +
+  geom_histogram() +
+  labs(title = "Distribution of weights of all high schoolers",
+       x = "weight",
+       y = "# of observations") +
+  theme_bw()
+
+```
+From the summary statistics above as well as the histogram we can see that our data is right-skewed, meaning that the mean is higher than the median. Therefore, it seems that we have many outliers on the higher end of the distribution that would be considered obese high schoolers.
+
+Since the "normal" (or healthy) weight differs between boys and girls and also among age groups, we also want to look at the weight distribution in more detail for the different genders and for the different age groups. We do this with the following code.
+
+```{r}
+#first remove observations where gender or age is NA to have a clear summarising
+yrbss_upd <- yrbss %>% 
+  drop_na(age, gender)
+
+#summary statistics for weight by age
+yrbss_upd %>% 
+group_by(age) %>% # there are no instances where we there is no age data but there is weight data
+  summarise(min_weight = min(weight, na.rm = TRUE),
+   max_weight = max(weight, na.rm = TRUE),
+   median_weight = median(weight, na.rm = TRUE),
+   mean_weight = mean(weight, na.rm = TRUE),
+   sd_weight = sd(weight, na.rm = TRUE),
+   count = n()
+  )
+
+#summary statistics for weight by gender
+yrbss_upd %>% 
+group_by(gender) %>% # there are no instances where we there is no age data but there is weight data
+  summarise(min_weight = min(weight, na.rm = TRUE),
+   max_weight = max(weight, na.rm = TRUE),
+   median_weight = median(weight, na.rm = TRUE),
+   mean_weight = mean(weight, na.rm = TRUE),
+   sd_weight = sd(weight, na.rm = TRUE),
+   count = n()
+  )
+```
+
+```{r}
+#visualisation of distribution of weight by age group and gender
+ggplot(yrbss_upd,aes(x = weight, fill = gender)) +
+  geom_density()+
+  facet_wrap(~ age, scales = "free")+
+  labs(title = "Distribution of weight by age and gender",
+       x = "Weight",
+       y = "# of observations") +
+  theme_bw() +
+  #theme(legend.position = "none") + 
+  NULL
+```
+While we do not have a lot of data for 12- and 13-year olds, we can see from the density plots of the other ages that the weight distribution is very similar for the different ages. The data is always right-skewed with some outliers in the higher end. Comparing the different genders, we can see that the weight of male high schoolers is more variable and on average also higher than that of females.
+
+Next, we consider the possible relationship between a high schooler’s weight and their physical activity. Plotting the data is a useful first step because it helps us quickly visualize trends, identify strong associations, and develop research questions. We do this with the help of density plots.
+
+```{r}
+#create densityplots to inspect relationship between physical activity and weight
+
+yrbss %>% 
+  filter(!is.na(physically_active_7d)) %>% 
+  
+ggplot(aes(x = weight)) +
+  geom_density() +
+  facet_wrap(~physically_active_7d, nrow = 7) + 
+  labs(title = "Distribution of weights per # of physically active days",
+       x = NULL,
+       y = "Weight") + 
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  NULL
+```
+After a first inspection of the data, we cannot really see a big difference in the weight of high schoolers that are less physically active compared to those that are. In order to further test the relationship, we create a new variable in the dataframe `yrbss`, called `physical_3plus` , which will be `yes` if they are physically active for at least 3 days a week, and `no` otherwise. We also calculate the number and % of those who are and are not active for more than 3 days. We first use the `count()` function and see if we get the same results as `group_by()... summarise()`
+
+  
+```{r, mutate_and_count}
+#create new variable physical_3plus
+yrbss2 <- yrbss %>%
+  #remove observations where no value for physicaly_active_7d
+  filter(!is.na(physically_active_7d)) %>% 
+  mutate(physical_3plus = ifelse(physically_active_7d >= 3, "yes", "no"))
+
+#calculate number of high schoolers in each group with count
+yrbss2 %>%
+  count(physical_3plus) %>% 
+  mutate (perc = n/sum(n))
+
+#calculate number and percentage with group_by and summarise
+yrbss2 %>% 
+  group_by(physical_3plus) %>% 
+  summarise(n = n()) %>% 
+  mutate(perc = n/sum(n))
+
+#look at summary statistics for weight of the two groups
+favstats(weight~ physical_3plus, data = yrbss2)
+```
+
+Next, we provide a 95% confidence interval for the population proportion of high schoolers that are *NOT* active 3 or more days per week.
+
+```{r}
+yrbss2 %>% 
+  summarise(total = n(),
+            perc_no = sum(physical_3plus == "no")/total,
+            SE = sqrt(perc_no * (1-perc_no)/total),
+            z_critical = qt(0.975, total - 1),
+            lower = perc_no - z_critical * SE,
+            upper = perc_no + z_critical * SE
+            )
+```
+From the output above, we can see that the 95% confidence interval for the proportion of high schoolers being active 2 days or less per week is [0.323; 0.339].
+
+To inspect the relationship between `physical_3plus` vs. `weight`, we next create a boxplot diagram.
+
+```{r, boxplot}
+# Boxplot of weights for those who answered yes or no 
+yrbss2 %>% 
+  ggplot(aes(x = physical_3plus, y = weight))+
+  geom_boxplot()+
+  labs(title = "Relationship between physical activity and weight of high schoolers",
+       x = "At least 3 physically active days per week",
+       y = "Weight (kg)") +
+  theme_bw() +
+  NULL
+```
+Somewhat surprisingly, those who exercise more than 3 times a week have a marginally higher median weight than those who exercise less than or equal to 3 times a week. Perhaps this is a result of the composition of those that do exercise more than 3 times a week, influential variables likely being age, gender and height. It might also be the case that those who excercise more have more muscles which are known to weigh more. Unsurprisingly, the highest observed weight was within the group that exercised less than 3 times a week. This was unsurprising because it is unlikely someone who exercises regularly, even considering height, age and gender, would weigh over 175kg. Considering this, the "no" group has the largest range possessing the lowest and highest weights of the entire data set. The two groups do, however, share similar inter-quartile ranges.
+
+## Confidence Interval
+
+Boxplots show how the medians of the two distributions compare, but we can also compare the means of the distributions using either a confidence interval or a hypothesis test. Note that when we calculate the mean, SD, etc. weight in these groups using the mean function, we must ignore any missing values by setting the `na.rm = TRUE`.
+
+
+```{r, ci_using_formulas}
+#calculate confidence intervals for the two groups
+yrbss2 %>% 
+  group_by(physical_3plus) %>% 
+  summarise (mean_weight = mean(weight, na.rm = TRUE),
+    sd_weight = sd(weight, na.rm = TRUE),
+    count = n(),
+    SE = sd_weight/sqrt(count),
+    t_critical = qt(0.975, count - 1),
+    lower = mean_weight - t_critical * SE,
+    upper = mean_weight + t_critical * SE)
+```
+
+There is an observed difference of about 1.77kg (68.44 - 66.67), and we notice that the two confidence intervals do not overlap. It seems that the difference is at least 95% statistically significant. Let us also conduct a hypothesis test.
+
+## Hypothesis test with formula
+
+For our hypothesis test, we first write down the null and alternative hypotheses. The null hypothesis assumes that there is no difference in the mean weight between high schoolers who are physically active at least 3 times a week and those who are not. The alternative hypothesis states that there is a difference.
+
+$Claim (null \space hypothesis) \space H_0: \delta = 0$
+
+$Altnerative \space hypothesis \space H_a: \delta ≠ 0$
+
+```{r, t_test_using_R}
+t.test(weight ~ physical_3plus, data = yrbss2)
+```
+
+Looking at the output from the `t.test()` above, we can see that the p-value is very small, and the confidence interval does not contain 0. Therefore, we can reject the null hypothesis based on this output.
+
+## Hypothesis test with `infer`
+
+Next, we will introduce a new function, `hypothesize`, that falls into the infer workflow. We will use this method for conducting hypothesis tests.
+
+But first, we need to initialize the test, which we will save as `obs_diff`.
+
+```{r, calc_obs_difference}
+obs_diff <- yrbss2 %>%
+  specify(weight ~ physical_3plus) %>%
+  calculate(stat = "diff in means", order = c("yes", "no"))
+
+```
+
+Notice how we can use the functions `specify` and `calculate` again like we did for calculating confidence intervals. Here, though, the statistic we are searching for is the difference in means, with the order being yes - no != 0.
+
+After we have initialized the test, we need to simulate the test on the null distribution, which we will save as null.
+
+
+```{r, hypothesis_testing_using_infer_package}
+set.seed(112)
+
+null_dist <- yrbss2 %>%
+  # specify variables
+  specify(weight ~ physical_3plus) %>%
+  
+  # assume independence, i.e, there is no difference
+  hypothesize(null = "independence") %>%
+  
+  # generate 1000 reps, of type "permute"
+  generate(reps = 1000, type = "permute") %>%
+  
+  # calculate statistic of difference, namely "diff in means"
+  calculate(stat = "diff in means", order = c("yes", "no"))
+
+```
+
+
+Here, `hypothesize` is used to set the null hypothesis as a test for independence, i.e., that there is no difference between the two population means. In one sample cases, the null argument can be set to *point* to test a hypothesis relative to a point estimate.
+
+Also, note that the `type` argument within `generate` is set to `permute`, which is the argument when generating a null distribution for a hypothesis test.
+
+We can visualize this null distribution with the following code:
+
+```{r}
+ggplot(data = null_dist, aes(x = stat)) +
+  geom_histogram()
+```
+
+
+Now that the test is initialized and the null distribution formed, we can visualise to see how many of these null permutations have a difference of at least `obs_stat` of `r obs_diff %>% pull() %>% round(2)`.
+
+We can also calculate the p-value for your hypothesis test using the function `infer::get_p_value()`.
+
+```{r}
+
+null_dist %>% visualize() +
+  shade_p_value(obs_stat = obs_diff, direction = "two-sided")
+
+null_dist %>%
+  get_p_value(obs_stat = obs_diff, direction = "two_sided")
+
+```
+
+This the standard workflow for performing hypothesis tests. We have got the same result (rejection of null hypothesis) as in doing hypothesis test with `t.test()` function.
+
+# IMDB ratings: Differences between directors
+
+Let us recall the IMBD ratings data from the past homeworks. This time, we want to explore whether the mean IMDB rating for Steven Spielberg and Tim Burton are the same or not. Looking at the graph below, where the the confidence intervals for the mean ratings of these two directors have been calculated, we can see they overlap. 
+
+
+```{r directors, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "directors.png"), error = FALSE)
+```
+
+As a first step, we want to reproduce this graph.
+
+In addition, we will run a hypothesis test using both the `t.test` command and the `infer` package to simulate from a null distribution, where we assume zero difference between the two.
+
+> Before anything, we write down the null and alternative hypotheses.
+
+We set up a null hypothesis that assumes that there is no difference in means, i.e. that the difference is 0 and the effect is not real. Our alternative hypothesis is that the difference is not 0. In mathematical terms, this leads to the following two hypotheses:
+
+$Claim (null \space hypothesis) \space H_0: \delta = 0$
+
+$Altnerative \space hypothesis \space H_a: \delta ≠ 0$
+
+We also choose our significance level at 5\%.
+
+Now we can load the data and examine its structure.
+
+```{r load-movies-data}
+movies <- read_csv(here::here("data", "movies.csv"))
+glimpse(movies)
+```
+
+In order to reproduce the graph above, we will first modify the `movies` dataset.
+
+```{r}
+#prepare dataset
+directors <- movies %>% 
+  filter(director  %in% c("Tim Burton", "Steven Spielberg")) #only keep observations with Burton and Spielberg as directors
+
+#calculate CI of mean ratings with formula
+directors_CI <- directors %>% 
+  group_by(director) %>% 
+  summarise(
+    mean_rating = mean(rating),
+    n = count(director),
+    SE = sd(rating)/sqrt(n),
+    t_critical = qt(0.975, (n-1)),
+    lower = mean_rating - t_critical * SE,
+    upper = mean_rating + t_critical * SE
+  ) 
+
+directors_CI
+```
+Now that we have calculated the confidence intervals for the ratings of the two directors, we can plot the graph from above.
+
+```{r, fig.height=6, fig.width=10}
+ggplot(directors_CI, aes(x = mean_rating,
+                      y = fct_reorder(director, mean_rating),
+                      color = director)) +
+  
+  #add rectangle first so that appears in background
+  geom_rect(xmin = 7.27, xmax = 7.33,
+            ymin = 0, ymax = Inf,
+            linetype = "blank",
+            fill = "grey",
+            alpha = 0.5) +
+  
+  #add point and bar showing CIs
+  geom_point(size = 5) + 
+  geom_errorbarh(aes(xmin = lower, #add bars to visualise CI
+                    xmax = upper),
+                 size = 2,
+                 height = 0.1) +
+  labs(title = "Do Spielberg and Burton have the same mean IMDB ratings?",
+       subtitle = "95% confidence intervals overlap",
+       x = "Mean IMBD Rating",
+       y = NULL,
+       color = NULL) +
+  
+  #add labels to CIs
+  annotate("text", x = 7.57, y = 2.13, label = "7.57", size = 8) +
+  annotate("text", x = 7.27, y = 2.12, label = "7.27", size = 5) +
+  annotate("text", x = 7.87, y = 2.12, label = "7.87", size = 5) +
+  annotate("text", x = 6.93, y = 1.13, label = "6.93", size = 8) +
+  annotate("text", x = 6.53, y = 1.12, label = "6.53", size = 5) +
+  annotate("text", x = 7.33, y = 1.12, label = "7.33", size = 5) +
+  theme_bw() + 
+  theme(plot.title = element_text(size = 13, face = "bold"),
+        text = element_text(size = 11),
+        legend.position = "none") +
+  NULL
+```
+Since the confidence intervals shown above overlap, we will run a hypothesis test in order to check whether there is a significant difference in means. We will do this once with the `t.test()` functions and the other time with the help of the `infer` package.
+
+```{r}
+#hypothesis test using t.test()
+t.test(rating ~ director, data = directors)
+```
+
+```{r, fig.height=4}
+#hypothesis test using simulation
+set.seed(113)
+
+#calculate observed difference in means
+observed_difference <- directors %>%
+  specify(rating ~ director) %>%
+  calculate(stat = "diff in means", order = c("Steven Spielberg", "Tim Burton"))
+
+#simulate data under a scenario where difference is 0
+ratings_comp <- directors %>% 
+  specify(rating ~ director) %>% 
+  hypothesise(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in means",
+            order = c("Steven Spielberg", "Tim Burton"))
+
+#visualise distribution of null hypothesis world and show observed difference as red line
+ratings_comp %>% visualize() +
+  shade_p_value(obs_stat = observed_difference, direction = "two-sided")
+  
+#calculate p-value
+ratings_comp %>% 
+  get_pvalue(obs_stat = observed_difference,
+             direction = "both")
+```
+
+> Resulting test statistic and the associated t-stat or p-value and conclusion
+
+Looking at the results of `t.test` and the simulation exercise, we reject the null hypothesis. `t.test` gives us a t-statistic of 3 and a p-value of 0.01, which is significantly below our pre-set significance level. Looking at the resulting confidence interval of [0.16, 1.13] from the `t.test` function, we can also see that 0 does not lie in this interval. This result is confirmed by the hypothesis test done with the help of the `infer` package, which results in a p-value of 0.002, which is also well below our significance level of 0.05. Therefore, we conclude that the movies by Steven Spielberg and Tim Burton do not have the same IMDB rating, with Steven Spielberg achieving higher ratings.
+
+
+# Omega Group plc- Pay Discrimination
+
+At the last board meeting of Omega Group Plc., the headquarters of a large multinational company, the issue was raised that women were being discriminated in the company, in the sense that the salaries were not the same for male and female executives. A quick analysis of a sample of 50 employees (of which 24 men and 26 women) revealed that the average salary for men was about 8,700 higher than for women. This seemed like a considerable difference, so it was decided that a further analysis of the company salaries was warranted. 
+
+The objective of this analysis is to find out whether there is indeed a significant difference between the salaries of men and women, and whether the difference is due to discrimination or whether it is based on another, possibly valid, determining factor.
+
+## Loading the data
+
+```{r load_omega_data}
+omega <- read_csv(here::here("data", "omega.csv"))
+
+# examine the data frame
+glimpse(omega) 
+```
+
+## Relationship Salary - Gender ?
+
+The data frame `omega`  contains the salaries for the sample of 50 executives in the company. We want to answer the question whether there is a significant difference between the salaries of the male and female executives.
+
+We can perform different types of analyses, and check whether they all lead to the same conclusion 
+
+-	Confidence intervals
+-	Hypothesis testing
+-	Correlation analysis
+-	Regression
+
+As a first step, we calculate summary statistics on salary by gender. Also, we create and print a dataframe where, for each gender, we show the mean, SD, sample size, the t-critical, the SE, the margin of error, and the low/high endpoints of a 95% confidence interval
+
+```{r, confint_single_valiables}
+# Summary Statistics of salary by gender
+mosaic::favstats (salary ~ gender, data=omega)
+
+# Dataframe with two rows (male-female) and having as columns gender, mean, SD, sample size, 
+# the t-critical value, the standard error, the margin of error, 
+# and the low/high endpoints of a 95% confidence interval
+salary_by_gender <- omega %>%
+  group_by(gender) %>% 
+  summarise(mean_salary = mean(salary),
+            sd_salary = sd(salary),
+            n = n(),
+            t_crit = qt(0.975, n-1),
+            SE = sd_salary/sqrt(n),
+            margin_of_error = t_crit * SE,
+            lower = mean_salary - margin_of_error,
+            upper = mean_salary + margin_of_error
+  )
+
+salary_by_gender
+
+```
+
+> Conclusion from above analysis
+
+The data analysis shows that there is indeed a difference in the 
+salaries of men and women. The difference in the mean and median of men and women is almost 10,000 even though the dispersion of the data sets is very similar as shown by their standard deviations. The most interesting part is that the 95% confidence intervals do not overlap at all, meaning that we can be 95% confident that the true means do not overlap and we can reject the null hypothesis that there is no difference in the salary means of men and women.
+
+We can also run a hypothesis testing, assuming as a null hypothesis that the mean difference in salaries is zero, or that, on average, men and women make the same amount of money. We run our hypothesis testing using `t.test()` and with the simulation method from the `infer` package. In addition, we calculate the correlation coefficient between gender and salary and perform a linear regression with gender as indepedent and salary as dependent variable.
+
+```{r, hypothesis_testing}
+# hypothesis testing using t.test() 
+t.test(salary ~ gender, data=omega)
+
+# hypothesis testing using infer package
+test_diff <- omega %>%
+  specify(salary ~ gender) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps =1000, type ="permute") %>%
+  calculate(stat = "diff in means",
+            order = c("male", "female"))
+
+#calculate difference in means to calculate mean value
+salary_diff <- omega %>%
+  specify(salary ~ gender) %>%
+  calculate(stat = "diff in means", order = c("male", "female"))
+
+test_diff %>% 
+  get_pvalue(obs_stat = salary_diff,
+             direction = "both")
+```
+
+As a next step, we also calculate the correlation coefficient between gender and salary and perform a linear regression.
+
+```{r}
+#calculate correlation coefficient between gender and salary
+# use function biserial.cor from ltm package
+library(ltm)
+biserial.cor(omega$salary, omega$gender, level = 2)
+
+#alternative method - assign number to gender and calculate coefficient with cor() function
+omega %>% 
+  mutate(genderN = ifelse(gender == "male", 1, 0)) %>% 
+  dplyr::select(genderN, salary) %>% 
+  cor()
+
+#run linear regression with salary as dependent variable and gender as independent variable
+salary_reg <- glm(salary ~ gender, data = omega)
+summary(salary_reg) #significant result
+```
+
+> Conclusion from the analysis above
+
+The correlation between gender and salary was found by assigning the male gender a value of 1. The correlation was then found to be 0.508, which means there is a moderate positive correlation between salary and gender. 
+Both hypothesis tests also show that there is a significant difference in the salaries of men and women as the p value is 0, meaning that the null hypothesis, which states that the mean differences of the salaries of men and women is 0, can be rejected. 
+
+
+## Relationship Experience - Gender?
+
+At the board meeting, someone raised the issue that there was indeed a substantial difference between male and female salaries, but that this was attributable to other reasons such as differences in experience. A questionnaire send out to the 50 executives in the sample reveals that the average experience of the men is approximately 21 years, whereas the women only have about 7 years experience on average (see table below).
+
+```{r, experience_stats}
+# Summary Statistics of experience by gender
+favstats (experience ~ gender, data=omega)
+```
+
+
+Based on this evidence, as the data shows above, we can conclude that there is a huge difference in the experience of male and female executives. The mean and median for male executives is 21.1 and 19.5 respectively while the mean and median for females is 3.0 and 7.4 respectively. The difference in the mean of the two groups is 13.7 and the difference in the median of the two groups is 16.5. While there is big difference in the mean and median, the standard deviations are fairly similar meaning the spread of the datasets is somewhat similar.
+
+We now perform similar analyses as in the previous section and will test whether theses analyses validate or endanger our conclusion about the difference in male and female salaries.
+
+```{r}
+# Dataframe with two rows (male-female) and having as columns gender, mean, SD, sample size, 
+# the t-critical value, the standard error, the margin of error, 
+# and the low/high endpoints of a 95% confidence interval
+experience_by_gender <- omega %>%
+  group_by(gender) %>% 
+  summarise(mean_experience = mean(experience),
+            sd_experience = sd(experience),
+            n = n(),
+            t_crit = qt(0.975, n-1),
+            SE = sd_experience/sqrt(n),
+            margin_of_error = t_crit * SE,
+            lower = mean_experience - margin_of_error,
+            upper = mean_experience + margin_of_error
+  )
+
+experience_by_gender
+```
+Let us know also run the `t.test()` and a simulation with `infer`.
+
+```{r}
+# hypothesis testing using t.test() 
+t.test(experience ~ gender, data=omega)
+
+# hypothesis testing using infer package
+diff_experience <- omega %>%
+  specify(experience ~ gender) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps =1000, type ="permute") %>%
+  calculate(stat = "diff in means",
+            order = c("female", "male"))
+
+#calculate difference in means to calculate mean value
+experience_diff <- omega %>%
+  specify(experience ~ gender) %>%
+  calculate(stat = "diff in means", order = c("male", "female"))
+
+
+diff_experience %>% 
+  get_pvalue(obs_stat = experience_diff,
+             direction = "both")
+```
+
+```{r}
+#calculate correlation coefficient between gender and experience
+# use function biserial.cor from ltm package
+biserial.cor(omega$experience, omega$gender, level = 2)
+
+#alternative method - assign number to gender and calculate coefficient with cor() function
+omega %>% 
+  mutate(genderN = ifelse(gender == "male", 1, 0)) %>% 
+  dplyr::select(genderN, experience) %>% 
+  cor()
+
+#run linear regression with salary as dependent variable and gender as independent variable
+experience_reg <- glm(experience ~ gender, data = omega)
+summary(experience_reg) #significant result
+```
+
+This results of our analysis above endangers our conclusion that the difference in salaries is only due to the gender of the employees. As can be seen from the two hypothesis tests as well as the correlation coefficient and the linear regression (showing that the gender male has significantly more experience), there is a difference in male and female experiences. The t test of experience and gender returned a p value of 0, meaning that the null hypothesis can be rejected. This indicates that experience might also be a reason that leads to the difference in salaries, and thus the difference in salaries of men and women is not only due to gender.
+
+## Relationship Salary - Experience ?
+
+Someone at the meeting argues that clearly, a more thorough analysis of the relationship between salary and experience is required before any conclusion can be drawn about whether there is any gender-based salary discrimination in the company.
+
+We now analyse the relationship between salary and experience. First, we draw a scatterplot to visually inspect the data.
+
+
+```{r, salary_exp_scatter}
+
+#draw scatterplot to show relationship between salary and experience
+ggplot(omega, aes(x=experience, y = salary))+
+  geom_point() +
+  geom_smooth(se=FALSE) +
+  theme_bw() + 
+  labs(title = "Relationship between experience and salary",
+          y = "Salary",
+          x = "Experience (years)") +
+  NULL
+
+```
+Now that we see a positive relation between salary and experience in the scatterplot, we can also calculate the correlation coefficient.
+
+```{r}
+#calculate correlation coefficient
+omega %>% 
+  dplyr::select(salary, experience) %>% 
+  cor()
+
+#perform linear regression
+experience_salary_reg <- lm(salary ~ experience, data = omega)
+summary(experience_salary_reg)
+```
+
+The scatterplot between salary and experience shows that there is a positive correlation between the two variables. This is supported by the correlation coefficient, which is calculated to be 0.8, which means the two variables are strongly positively correlated to one another. While correlation does not equal causation, this still is a strong sign that salaries are based on the experience of the employees. This is indeed confirmed by the linear regression we perform which shows that the salary increases by 584.3 for each 1-year increase in experience. The result is statistically significant.
+
+## Check correlations between the data
+We can use `GGally:ggpairs()` to create a scatterplot and correlation matrix. Essentially, we change the order our variables will appear in and have the dependent variable (Y), salary, as last in our list. We then pipe the dataframe to `ggpairs()` with `aes` arguments to colour by `gender` and make the plots somewhat transparent (`alpha  = 0.3`).
+
+```{r, ggpairs}
+omega %>% 
+  dplyr::select(gender, experience, salary) %>% #order variables they will appear in ggpairs()
+  ggpairs(aes(colour=gender, alpha = 0.3))+
+  theme_bw()
+```
+
+> Conclusion from salary vs experience scatterplot
+
+The salary vs experience scatterplot infers that there is a positive relationship between the two, meaning that the higher the salary, the higher you can expect the experience to be and vice versa. The scatterplot also shows us the dots colored according to the gender and we can clearly see that the blue dots representing male employees are more to the upper-right whereas the red dots representing female employees are mainly concentrated in the bottom left corner. This shows that male employees have a higher experience than female employees and are also generally paid more. However, looking at the red dot that is the furthest to the right (around 30 years of experience) and comparing it to a similar blue dot, the salary of this employee seems to be rather low compared to that of male employees with a similar level of experience. The same holds true for those employees with experiences between 10 and 20 years where the highest salaries are all paid to men. Therefore, there might still be a certain level of discrimination based on gender. However, more data would be needed in order to verify this statement.
+
+
+# Challenge 1: Yield Curve inversion
+
+Every so often, we hear warnings from commentators on the "inverted yield curve" and its predictive power with respect to recessions. An explainer what a [inverted yield curve is can be found here](https://www.reuters.com/article/us-usa-economy-yieldcurve-explainer/explainer-what-is-an-inverted-yield-curve-idUSKBN1O50GA) or in a great podcast from [NPR on yield curve indicators](https://www.podbean.com/media/share/dir-4zgj9-6aefd11). A very nice article that explains the [yield curve is and its inversion can be found here](https://fredblog.stlouisfed.org/2018/10/the-data-behind-the-fear-of-yield-curve-inversions/)
+
+In addition, many articles and commentators think that, e.g., [*Yield curve inversion is viewed as a harbinger of recession*](https://www.bloomberg.com/news/articles/2019-08-14/u-k-yield-curve-inverts-for-first-time-since-financial-crisis). One can always doubt whether inversions are truly a harbinger of recessions, and [use the attached parable on yield curve inversions](https://twitter.com/5_min_macro/status/1161627360946511873).
+
+```{r yield_curve_parable.jpg, echo=FALSE, out.width="70%"}
+knitr::include_graphics(here::here("images", "yield_curve_parable.jpg"), error = FALSE)
+```
+
+In order to better understand yield curve inversion, we will look at US data and use the [FRED database](https://fred.stlouisfed.org/) to download historical yield curve rates, and plot the yield curves since 1999 to see when the yield curves flatten and invert. At the end of this challenge we will produce this chart:
+
+```{r yield_curve_challenge, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "yield_curve_challenge.png"), error = FALSE)
+```
+
+First, we will load the yield curve data file that contains data on the yield curve since 1960-01-01.
+
+```{r download_historical_yield_curve, warning=FALSE}
+
+yield_curve <- read_csv(here::here("data", "yield_curve.csv"))
+
+glimpse(yield_curve)
+```
+
+Our dataframe `yield_curve` has five columns (variables):
+
+- `date`: already a date object
+- `series_id`: the FRED database ticker symbol
+- `value`: the actual yield on that date
+- `maturity`: a short hand for the maturity of the bond
+- `duration`: the duration, written out in all its glory!
+
+
+## Plotting the yield curve
+
+We will produce three plots to see what yield curves look like since 1960. We will firstly look at the given plot and then try to produce our own version.
+
+### Yields on US rates by duration since 1960
+
+Given plot:
+
+```{r yield_curve_1, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "yield_curve1.png"), error = FALSE)
+```
+
+Produce our own plot:
+
+```{r, fig.width = 12, fig.height = 9}
+
+#use factor() to convert duration into a factor (with order)
+yield_curve <- yield_curve %>% 
+  mutate(duration = factor(duration,
+                           levels = c("3-Month Treasury Bill",
+                                      "6-Month Treasury Bill",
+                                      "1-Year Treasury Rate",
+                                      "2-Year Treasury Rate",
+                                      "3-Year Treasury Rate",
+                                      "5-Year Treasury Rate",
+                                      "7-Year Treasury Rate",
+                                      "10-Year Treasury Rate",
+                                      "20-Year Treasury Rate",
+                                      "30-Year Treasury Rate")))
+
+#create the line plot
+ggplot(yield_curve,
+       aes(x = date,
+           y = value,
+           color = duration)) +
+  geom_line() +
+  facet_wrap(~duration,
+             nrow = 5) +
+  labs(x = NULL,
+       y = "%",
+       title = "Yields on U.S. Treasury rates since 1960",
+       caption = "Source: St. Louis Federal Reserve Economic Database (FRED)") +
+  theme_bw() +
+  theme(text = element_text(size = 11),
+        legend.position = "none") +
+  NULL
+
+```
+
+### Monthly yields on US rates by duration since 1999 on a year-by-year basis
+
+Given plot:
+
+```{r yield_curve_2, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "yield_curve2.png"), error = FALSE)
+```
+
+Produce our own plot:
+
+Before we do the plotting, we need to add two new columns to explicitly record the year and month of every date.
+
+```{r}
+
+#use factor() to convert maturity into a factor (with order)
+#label the year and month of every sample point
+yield_curve <- yield_curve %>% 
+  mutate(maturity = factor(maturity,
+                           levels = c("3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "20y", "30y")),
+         year = year(date),
+         month = month(date, label = TRUE))
+
+glimpse(yield_curve)
+```
+
+Now we can proceed with plotting.
+
+```{r, fig.width = 12, fig.height = 9}
+
+#create the line plot
+#use factor() to prevent the color pool from becoming continuous
+yield_curve %>% 
+  filter(year >= 1999) %>% 
+  ggplot(aes(x = maturity,
+             y = value,
+             color = factor(year))) +
+  
+  #use group argument to group data by month in each facet
+  geom_line(aes(group = month)) +
+  
+  facet_wrap(~year,
+             nrow = 6) +
+  labs(x = "Maturity",
+       y = "Yield(%)",
+       title = "US Yield Curve",
+       caption = "Source: St. Lous Federal Reserve Economic Database (FRED)") +
+  theme_bw() +
+  theme(text = element_text(size = 11),
+        legend.position = "none") +
+  NULL
+
+```
+
+### 3-month and 10-year yields since 1999
+
+Given plot:
+
+```{r yield_curve_3, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "yield_curve3.png"), error = FALSE)
+```
+
+Produce our own plot:
+
+```{r, fig.width = 12, fig.height = 9}
+
+yield_curve %>% 
+  
+  #filter by multiple conditions
+  filter(maturity == "3m" | maturity == "10y",
+         year >= 1999) %>% 
+  
+  #create line plot
+  ggplot(aes(x = date,
+             y = value,
+             color = duration)) +
+  geom_line() +
+  labs(x = NULL,
+       y = "%",
+       title = "Yields on 3-month and 10-year US Treasury rates since 1999",
+       caption = "Source: St. Lous Federal Reserve Economic Database (FRED)") +
+  theme_bw() +
+  theme(text = element_text(size = 11),
+        legend.title = element_blank()) +
+  NULL
+
+```
+
+### Plotting yield curve inversion and recession
+
+First let's use the graph above to see how yield curve inversion predicted recession since 1999.
+
+According to [Wikipedia's list of recession in the United States](https://en.wikipedia.org/wiki/List_of_recessions_in_the_United_States), since 1999 there have been two recession in the US: between Mar 2001–Nov 2001 and between Dec 2007–June 2009. Looking at the graphs above, we investigate whether the yield curve seems to flatten before these recessions and whether a yield curve flattening really means a recession is coming in the US
+
+- We see from the second graph that the yield curve flattened in 2000 and 2006-2007,  perfectly preceding the two recessions mentioned. So, yes the yield curve does appear to flatten before these recessions. 
+
+- Although, the yield curve flattening appears to be a leading indicator of a recession we cannot conclude on the casualty of this relationship. It could merely be a coincidental correlation. However, due to the repetition and predictability of this relationship one could likely draw inference if it occurs again in the future. The likely justification for the relationship is that the inversion is actually a somewhat binary reflection of the current macro-economic landscape and so produces a clear output from the various economic, political and societal inputs leading up to it. It may prove more predictive if the "signal" is combined with further economic analysis of the US and global economies. 
+
+- Short-term (3 months) yield exceeded longer term (10 years) yield briefly in late 2000, late 2006 and late 2019 all signalling an upcoming recession.
+
+To generalize this phenomena, we need to expand our time horizon and make a more informative graph indicating when the recession arrived.
+
+The code below creates a dataframe with all US recessions since 1946.
+
+```{r setup_US-recessions, warning=FALSE}
+
+# get US recession dates after 1946 from Wikipedia 
+# https://en.wikipedia.org/wiki/List_of_recessions_in_the_United_States
+
+recessions <- tibble(
+  from = c("1948-11-01", "1953-07-01", "1957-08-01", "1960-04-01", "1969-12-01", "1973-11-01", "1980-01-01","1981-07-01", "1990-07-01", "2001-03-01", "2007-12-01","2020-02-01"),  
+  to = c("1949-10-01", "1954-05-01", "1958-04-01", "1961-02-01", "1970-11-01", "1975-03-01", "1980-07-01", "1982-11-01", "1991-03-01", "2001-11-01", "2009-06-01", "2020-04-30") 
+  )  %>% 
+  mutate(from = ymd(from), 
+         to = ymd(to),
+         duration_days = to - from)
+
+head(recessions)
+```
+
+We will first calculate the spread between 10-year and 3-month treasury yields and then seperately mark the positive and negative spread into two new columns.
+
+```{r}
+
+yield_curve_spread <- yield_curve %>% 
+  
+  #select only relevant data
+  dplyr::select(date, value, maturity) %>% 
+  
+  #choose only 3-month and 10-year yields
+  filter(maturity == "3m" | maturity == "10y") %>% 
+  
+  #pivot the table to wider form with maturity as new names
+  pivot_wider(names_from = maturity,
+              values_from = value) %>% 
+  
+  #calculate yield spread, need to use ` to recognize column names with number
+  mutate(spread = `10y` - `3m`,
+         positive_spread = pmax(spread, 0),
+         negative_spread = pmin(spread, 0))
+
+
+glimpse(yield_curve_spread)
+
+```
+
+Now we can reproduce the graph:
+
+```{r, fig.width = 18, fig.height = 10}
+
+ggplot(yield_curve_spread,
+       aes(x = date)) +
+  
+  #add line plot for yield spreads and a horizontal line for zero spread
+  geom_line(aes(y = spread)) +
+  geom_hline(yintercept = 0,
+             color = "black",
+             size = 0.6) +
+  
+  #use geom_ribbon to see whether spread is positive or negative
+  geom_ribbon(aes(ymin = 0, ymax = positive_spread),
+              fill = "dodgerblue3",
+              alpha = 0.3) +
+  geom_ribbon(aes(ymin = negative_spread, ymax = 0),
+              fill = "red3",
+              alpha = 0.3) +
+  
+  #use geom_rect to add the grey shaded areas corresponding to recessions
+  #geom_rect doesn't produce the desired effect in terms of alpha, so we use annotate(geom = "rect", ...) to optimize the result
+  ggplot2::annotate(geom = "rect",
+           xmin = recessions$from, xmax = recessions$to,
+           ymin = -Inf, ymax = Inf,
+           fill = "black",
+           alpha = 0.2) +
+  
+  #use geom_rug for the small indicators at the bottom, with two differently sliced dataset from yield_curve_spread
+  geom_rug(data = yield_curve_spread[yield_curve_spread[ , "positive_spread"] != 0, , drop = FALSE],
+           color = "dodgerblue3",
+           alpha = 0.5,
+           sides = "b") +
+  geom_rug(data = yield_curve_spread[yield_curve_spread[ , "negative_spread"] != 0, , drop = FALSE],
+           color = "red3",
+           alpha = 0.5,
+           sides = "b") +
+  
+  #set the format of x-axis
+  scale_x_date(date_labels = "%Y",
+               limits = c(date("1959-01-01"), date("2023-01-01")),
+               expand = c(0.03, 0.03),
+               date_breaks = "2 years",
+               date_minor_breaks = "1 year") +
+  
+  #some other formatting
+  labs(x = NULL,
+       y = "Difference (10 year - 3 month) yield in %",
+       title = "Yield Curve Inversion: 10-year minus 3-month U.S. Treasury rates",
+       subtitle = "Difference in % points, monthly averages\nShaded areas correspond to recessions",
+       caption = "Source: FRED, Federal Reserve Bank at St. Louis") +
+  theme_bw() +
+  theme(text = element_text(size = 9),
+        plot.title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        panel.border = element_blank(),
+        panel.grid = element_line(color = "grey95"),
+        axis.ticks = element_blank()) +
+  NULL
+
+```
+
+Our answer for whether yield curve inversion can predict recession is: roughly yes. Among all 8 yield curve inversions since 1960, 7 of them were closely followed by an economic recession in US, and among all 8 recessions since 1960, also 7 of them were preceded by a yield curve inversion, while the remaining one (Jul 1990 - Mar 1991) was preceded by a deep yield curve flattening where the spread between 10-year and 3-month US Treasury rates almost hit zero.
+
+- One explanation for such relationship is expectations hypothesis: long-term rates are the expected short-term rate in the future. Under this hypothesis, yield on 10-year Treasury bond can be interpreted as the market's expectation on future short-term rate. When the market expect a rate cut from the Federal Reserve in the future in order to boost weak economy, this expectation will be reflected on the declining long-term yield. A self-fulfilling prophecy will pull down long-term yield further, eventually to a level below short-term yield.
+
+- Another explanation is, before recession actually arrives at the economy, investors who foresee such downside risk would rush to buy long-term bonds to secure their future cash flow as a safe haven asset, thus pushing up the price of long-term bonds, reducing their yields. When more and more people realize how bad the economic outlook is, long-term yield will go further down until a yield curve inversion happens.
+
+In conclusion, if a yield curve inversion happens today, it is highly likely that a recession is on the way. We don't have a certain causality at this point, but the repeated sequences of historic yield curve inversions and recessions have convinced us that these two things are correlated.
+
+
+# Details
+
+- Who did you collaborate with: team members of Study Group A14
+- Approximately how much time did you spend on this problem set: 7 hours on average for each team member
+- What, if anything, gave you the most trouble: figuring out the correlation with a categorical variable
+
+> As a true test to yourself, do you understand the code you submitted and are you able to explain it to someone else? 
+
+>Yes
+
+# Rubric
+
+Check minus (1/5): Displays minimal effort. Doesn't complete all components. Code is poorly written and not documented. Uses the same type of plot for each graph, or doesn't use plots appropriate for the variables being analyzed. 
+
+Check (3/5): Solid effort. Hits all the elements. No clear mistakes. Easy to follow (both the code and the output). 
+
+Check plus (5/5): Finished all components of the assignment correctly and addressed both challenges. Code is well-documented (both self-documented and with additional comments as necessary). Used tidyverse, instead of base R. Graphs and tables are properly labelled. Analysis is clear and easy to follow, either because graphs are labeled clearly or you've written additional text to describe how you interpret the output.
+
+
+
